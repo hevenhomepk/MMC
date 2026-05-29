@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>MMC – Manage Multi Couriers | Shopify Pakistan Courier App</title>
+  <meta name="description"
+    content="MMC centralizes TCS, Leopards, PostEx, Trax and 12+ Pakistani couriers inside your Shopify store. Automate bookings, labels, tracking and COD fulfillment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <style>
+    /* ── DARK THEME (default) ── */
+    :root,
+    [data-theme="dark"] {
+      --bg: #0a0d14;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: #1e2d45;
+      --green: #00e676;
+      --green2: #00c853;
+      --teal: #00bcd4;
+      --purple: #7c3aed;
+      --gold: #fbbf24;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --card: #131d2e;
+      --radius: 14px;
+      --nav-bg: #111827;
+      --hero-bg1: #0a0d14;
+      --hero-bg2: #0d1f2d;
+      --shadow: rgba(0, 0, 0, .4);
+    }
+
+    /* ── LIGHT THEME ── */
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface2: #f1f5f9;
+      --border: #e2e8f0;
+      --green: #059669;
+      --green2: #047857;
+      --teal: #0891b2;
+      --purple: #7c3aed;
+      --gold: #d97706;
+      --red: #dc2626;
+      --text: #0f172a;
+      --muted: #64748b;
+      --card: #ffffff;
+      --radius: 14px;
+      --nav-bg: rgba(255, 255, 255, .95);
+      --hero-bg1: #f0fdf4;
+      --hero-bg2: #ecfdf5;
+      --shadow: rgba(0, 0, 0, .08);
+    }
+
+    /* ── THEME SWITCHER ── */
+    .theme-switcher {
+      position: relative;
+      display: flex;
+      align-items: center;
+      margin-left: 12px;
+      flex-shrink: 0;
+    }
+
+    .theme-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .2s;
+      white-space: nowrap;
+    }
+
+    .nav-link {
+      padding: 8px 10px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      transition: 0.2s;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--green);
+    }
+
+    .theme-btn svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .theme-menu {
+      position: absolute;
+      top: calc(100% + 2px);
+      right: 0;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 180px;
+      box-shadow: 0 15px 45px rgba(0, 0, 0, 0.5);
+      z-index: 2147483647 !important;
+      display: none;
+    }
+
+    .theme-menu.open,
+    .theme-switcher:hover .theme-menu {
+      display: block !important;
+      animation: fadeIn .15s ease;
+    }
+
+    .theme-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text);
+      transition: .15s;
+    }
+
+    .theme-option:hover {
+      background: var(--surface2);
+    }
+
+    .theme-option.selected {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .theme-option svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-6px)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    /* NAV */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 9999999;
+      background: var(--nav-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 64px;
+      overflow: visible !important;
+      transition: background 0.3s;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    header::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      height: 64px;
+      max-height: 64px;
+      gap: 0;
+      overflow: visible !important;
+      position: relative;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px 14px 0;
+      border-right: 1px solid var(--border);
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .nav-logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .nav-logo span {
+      font-size: 18px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--green), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      flex-wrap: nowrap;
+      overflow: visible !important;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .nav-links::-webkit-scrollbar {
+      display: none;
+    }
+
+    .nav-link {
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+      transition: .2s;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+      color: var(--green);
+      background: var(--surface2);
+    }
+
+    .nav-link.active {
+      color: var(--text);
+    }
+
+    /* HERO */
+    .hero {
+      background: linear-gradient(135deg, var(--hero-bg1) 0%, var(--hero-bg2) 50%, var(--hero-bg1) 100%);
+      padding: 56px 24px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: background .3s;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(0, 230, 118, .08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 230, 118, .1);
+      border: 1px solid rgba(0, 230, 118, .25);
+      color: var(--green);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      letter-spacing: .5px;
+    }
+
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 60px);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--green), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 28px;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .2s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--green), var(--green2));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 230, 118, .35);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    /* SECTION */
+    section {
+      padding: 56px 24px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: clamp(24px, 3vw, 38px);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 15px;
+      max-width: 560px;
+    }
+
+    /* CREDITS SECTION */
+    .credits-section {
+      background: linear-gradient(135deg, rgba(0, 230, 118, .06), rgba(0, 188, 212, .06));
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .credits-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .credits-cards {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .credit-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 32px;
+      text-align: center;
+      min-width: 160px;
+    }
+
+    .credit-card .label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .credit-card .value {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .credit-card .value.plan {
+      color: var(--teal);
+    }
+
+    .credit-card .value.credits {
+      color: var(--gold);
+    }
+
+    .upgrade-btn {
+      background: linear-gradient(135deg, var(--purple), #a855f7);
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: .2s;
+      white-space: nowrap;
+    }
+
+    .upgrade-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(124, 58, 237, .4);
+    }
+
+    /* COURIERS GRID */
+    .couriers-section {
+      background: var(--surface);
+    }
+
+    .couriers-marquee-wrap {
+      position: relative;
+      overflow: hidden;
+      margin-top: 40px;
+    }
+
+    .couriers-marquee-wrap::before,
+    .couriers-marquee-wrap::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 80px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .couriers-marquee-wrap::before {
+      left: 0;
+      background: linear-gradient(to right, var(--surface), transparent);
+    }
+
+    .couriers-marquee-wrap::after {
+      right: 0;
+      background: linear-gradient(to left, var(--surface), transparent);
+    }
+
+    .couriers-track {
+      display: flex;
+      gap: 16px;
+      animation: scroll 30s linear infinite;
+      width: max-content;
+    }
+
+    .couriers-track:hover {
+      animation-play-state: paused;
+    }
+
+    .courier-pill {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+      transition: .2s;
+      cursor: pointer;
+    }
+
+    .courier-pill:hover {
+      border-color: var(--green);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 230, 118, .15);
+    }
+
+    .courier-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+
+    .courier-dot.inactive {
+      background: var(--muted);
+    }
+
+    .courier-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .courier-tag {
+      font-size: 10px;
+      color: var(--green);
+      background: rgba(0, 230, 118, .1);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .couriers-static {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .courier-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: .25s;
+      cursor: pointer;
+    }
+
+    .courier-card:hover {
+      border-color: var(--teal);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 188, 212, .12);
+    }
+
+    .courier-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .courier-info .name {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .courier-info .status {
+      font-size: 11px;
+      color: var(--green);
+    }
+
+    @keyframes scroll {
+      0% {
+        transform: translateX(0)
+      }
+
+      100% {
+        transform: translateX(-50%)
+      }
+    }
+  </style>
+  <script>
+  </script>
+</head>
+
+<body>
+
+  <!-- ALL DROPDOWNS (PORTAL) -->
+  <div id="logsPortalMenu"
+    style="position: fixed; min-width: 200px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted) !important; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+      Log Views</div>
+    <a href="#logs-all" class="theme-option" onclick="closeLogsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text);"></span>
+      All Couriers
+    </a>
+    <a href="#logs-tcs" class="theme-option" onclick="closeLogsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+      TCS Logs
+    </a>
+    <a href="#logs-postex" class="theme-option" onclick="closeLogsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      PostEx Logs
+    </a>
+  </div>
+
+  <div id="courierPortalMenu"
+    style="position: fixed; min-width: 200px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+      Select Courier</div>
+    <a href="#history-tcs" class="theme-option" onclick="closeCourierMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+      TCS Courier
+    </a>
+    <a href="#history-postex" class="theme-option" onclick="closeCourierMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      PostEx
+    </a>
+  </div>
+
+  <div id="loadsheetPortalMenu"
+    style="position: fixed; min-width: 200px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted) !important; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+      Loadsheet Actions</div>
+    <a href="#loadsheet-scanner" class="theme-option" onclick="closeLoadsheetMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>
+      Scanner
+    </a>
+    <a href="#loadsheet-logs" class="theme-option" onclick="closeLoadsheetMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text);"></span>
+      All Logs
+    </a>
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-top: 8px; margin-bottom: 4px;">
+      Courier Logs</div>
+    <a href="#loadsheet-logs-tcs" class="theme-option" onclick="closeLoadsheetMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+      TCS
+    </a>
+    <a href="#loadsheet-logs-postex" class="theme-option" onclick="closeLoadsheetMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      PostEx
+    </a>
+  </div>
+
+  <div id="returnPortalMenu"
+    style="position: fixed; min-width: 200px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted) !important; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+      Return Actions</div>
+    <a href="#return-add" class="theme-option" onclick="closeReturnMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>
+      Add Return
+    </a>
+    <a href="#return-sheets" class="theme-option" onclick="closeReturnMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+      Return Sheets
+    </a>
+    <a href="#return-pending" class="theme-option" onclick="closeReturnMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span>
+      Return Pending
+    </a>
+    <a href="#return-received" class="theme-option" onclick="closeReturnMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      Return Received
+    </a>
+  </div>
+
+  <div id="analyticsPortalMenu"
+    style="position: fixed; min-width: 200px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div
+      style="padding: 10px 16px; font-size: 10px; font-weight: 800; color: var(--muted) !important; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+      Analytics</div>
+    <a href="#analytics-performance" class="theme-option" onclick="closeAnalyticsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></span>
+      Courier Performance
+    </a>
+    <a href="#analytics-report" class="theme-option" onclick="closeAnalyticsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      Courier Report
+    </a>
+    <a href="#analytics-calendar" class="theme-option" onclick="closeAnalyticsMenu()"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; transition: .2s; color: var(--text) !important; text-decoration: none;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+      Courier Calendar
+    </a>
+  </div>
+
+  <div id="themePortalMenu"
+    style="position: fixed; min-width: 180px; background: var(--surface) !important; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2147483647; display: none; padding: 6px;">
+    <div class="theme-option" id="opt-dark" onclick="setTheme('dark')"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; cursor: pointer; color: var(--text) !important;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+      </svg>
+      Dark
+    </div>
+    <div class="theme-option" id="opt-light" onclick="setTheme('light')"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; cursor: pointer; color: var(--text) !important;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+        <circle cx="12" cy="12" r="4" />
+        <path
+          d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      </svg>
+      Light
+    </div>
+    <div class="theme-option" id="opt-system" onclick="setTheme('system')"
+      style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 8px; cursor: pointer; color: var(--text) !important;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21h8M12 17v4" />
+      </svg>
+      System
+    </div>
+  </div>
+
+  <script>
+    function closeAllMenus() {
+      document.getElementById('logsPortalMenu').style.display = 'none';
+      document.getElementById('courierPortalMenu').style.display = 'none';
+      document.getElementById('themePortalMenu').style.display = 'none';
+      document.getElementById('loadsheetPortalMenu').style.display = 'none';
+    }
+
+    function toggleLogsMenu(e) {
+      if (e) e.preventDefault(); e.stopPropagation();
+      const s = document.getElementById('logsSwitcher');
+      const m = document.getElementById('logsPortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.left = rect.left + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function toggleCourierMenu(e) {
+      if (e) e.stopPropagation();
+      const s = document.getElementById('courierSwitcher');
+      const m = document.getElementById('courierPortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.right = (window.innerWidth - rect.right) + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function toggleThemeMenu(e) {
+      if (e) e.stopPropagation();
+      const s = document.getElementById('themeSwitcher');
+      const m = document.getElementById('themePortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.right = (window.innerWidth - rect.right) + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function toggleLoadsheetMenu(e) {
+      if (e) e.preventDefault(); e.stopPropagation();
+      const s = document.getElementById('loadsheetSwitcher');
+      const m = document.getElementById('loadsheetPortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.left = rect.left + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function toggleReturnMenu(e) {
+      if (e) e.preventDefault(); e.stopPropagation();
+      const s = document.getElementById('returnSwitcher');
+      const m = document.getElementById('returnPortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.left = rect.left + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function closeLogsMenu() { document.getElementById('logsPortalMenu').style.display = 'none'; }
+    function closeCourierMenu() { document.getElementById('courierPortalMenu').style.display = 'none'; }
+    function closeThemeMenu() { document.getElementById('themePortalMenu').style.display = 'none'; }
+    function closeLoadsheetMenu() { document.getElementById('loadsheetPortalMenu').style.display = 'none'; }
+    function closeReturnMenu() { document.getElementById('returnPortalMenu').style.display = 'none'; }
+    function closeAnalyticsMenu() { document.getElementById('analyticsPortalMenu').style.display = 'none'; }
+
+    function toggleAnalyticsMenu(e) {
+      if (e) e.preventDefault(); e.stopPropagation();
+      const s = document.getElementById('analyticsSwitcher');
+      const m = document.getElementById('analyticsPortalMenu');
+      if (!s || !m) return;
+      const rect = s.getBoundingClientRect();
+      m.style.top = (rect.bottom - 2) + 'px'; m.style.left = rect.left + 'px';
+      const isOpen = m.style.display === 'block';
+      closeAllMenus();
+      m.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function closeAllMenus() {
+      document.getElementById('logsPortalMenu').style.display = 'none';
+      document.getElementById('courierPortalMenu').style.display = 'none';
+      document.getElementById('themePortalMenu').style.display = 'none';
+      document.getElementById('loadsheetPortalMenu').style.display = 'none';
+      document.getElementById('returnPortalMenu').style.display = 'none';
+      document.getElementById('analyticsPortalMenu').style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.theme-switcher') && !e.target.closest('[id$="PortalMenu"]')) closeAllMenus();
+    });
+  </script>
+
+  <!-- HEADER -->
+  <header>
+    <div class="nav-inner">
+      <div class="nav-logo">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="8" fill="url(#lg)" />
+          <path d="M8 12l8-4 8 4v8l-8 4-8-4V12z" fill="none" stroke="#fff" stroke-width="1.5" />
+          <path d="M16 8v16M8 12l8 4 8-4" stroke="#fff" stroke-width="1.5" />
+          <defs>
+            <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#00e676" />
+              <stop offset="1" stop-color="#00bcd4" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>MMC</span>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link active" href="#dashboard">Dashboard</a>
+        <a class="nav-link" href="#bookings">Bookings</a>
+        <!-- COURIER LOGS DROPDOWN -->
+        <div class="theme-switcher" id="logsSwitcher" style="margin-right: 14px;">
+          <button onclick="toggleLogsMenu(event)"
+            style="background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; white-space: nowrap;"
+            onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+            Courier Logs
+            <svg style="pointer-events: none;" width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        <div class="theme-switcher" id="loadsheetSwitcher" style="margin-right: 14px;">
+          <button onclick="toggleLoadsheetMenu(event)"
+            style="background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; white-space: nowrap;"
+            onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+            Loadsheet
+            <svg style="pointer-events: none;" width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        <div class="theme-switcher" id="returnSwitcher" style="margin-right: 14px;">
+          <button onclick="toggleReturnMenu(event)"
+            style="background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; white-space: nowrap;"
+            onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+            Return
+            <svg style="pointer-events: none;" width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        <div class="theme-switcher" id="analyticsSwitcher" style="margin-right: 14px;">
+          <button onclick="toggleAnalyticsMenu(event)"
+            style="background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; white-space: nowrap;"
+            onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+            Analytics
+            <svg style="pointer-events: none;" width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        <a class="nav-link" href="#modules">Modules</a>
+        <a class="nav-link" href="#shipper">Shipper Settings</a>
+        <a class="nav-link" href="#plans">Plans</a>
+        <a class="nav-link" href="#guides">Guides</a>
+      </div>
+
+
+      <!-- COURIER SWITCHER -->
+      <div class="theme-switcher" id="courierSwitcher" style="margin-right: 14px;">
+        <button onclick="toggleCourierMenu(event)"
+          style="background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; white-space: nowrap;"
+          onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+          Courier Settings
+          <svg style="pointer-events: none;" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- THEME SWITCHER -->
+      <div class="theme-switcher" id="themeSwitcher">
+        <button class="theme-btn" id="themeBtn" onclick="toggleThemeMenu(event)" aria-label="Display settings">
+          <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <span id="themeBtnLabel">System</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- REACT APP ROOT -->
+  <div id="root"></div>
+
+  <!-- HERO -->
+  <div class="hero" id="dashboard">
+    <div class="hero-badge">🇵🇰 Pakistan's #1 Multi-Courier Shopify App</div>
+    <h1>Manage All Couriers<br /><span>From One Dashboard</span></h1>
+    <p>Connect TCS, Leopards, PostEx, Trax &amp; 12+ couriers to your Shopify store. Automate bookings, labels, tracking
+      &amp; COD fulfillment in seconds.</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary" onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})">🚀
+        Get Started Free</button>
+      <button class="btn btn-outline"
+        onclick="document.getElementById('modules').scrollIntoView({behavior:'smooth'})">Explore Features</button>
+      <button class="btn btn-outline">📹 Watch Demo</button>
+    </div>
+  </div>
+
+  <!-- CREDITS -->
+  <section class="credits-section" id="credits">
+    <div class="container">
+      <div class="credits-grid">
+        <div>
+          <div class="section-label">Current Subscription</div>
+          <div class="section-title" style="font-size:26px;">Plan &amp; Remaining Credits</div>
+          <p style="color:var(--muted);font-size:14px;margin-top:6px;">Credits refresh every cycle. Unused credits carry
+            over on renewal.</p>
+          <div class="credits-cards" style="margin-top:20px;">
+            <div class="credit-card">
+              <div class="label">Active Plan</div>
+              <div class="value plan">Free Trial</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Resets Daily</div>
+            </div>
+            <div class="credit-card">
+              <div class="label">Credits Left</div>
+              <div class="value credits">5 / 7</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Bookings Today</div>
+            </div>
+            <div class="credit-card">
+              <div class="label">Status</div>
+              <div class="value" style="color:var(--green);font-size:20px;">● Active</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">All Systems Go</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+          <button class="upgrade-btn" onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})">⚡
+            Upgrade Plan</button>
+          <p style="font-size:11px;color:var(--muted);text-align:right;">Need help? WhatsApp: +923334291329</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COURIERS -->
+  <section class="couriers-section" id="couriers">
+    <div class="container">
+      <div class="section-label">Supported Networks</div>
+      <div class="section-title">All Major Pakistani Couriers</div>
+      <p class="section-sub">Connect your existing courier accounts — no switching portals, ever again.</p>
+
+      <div class="couriers-static" style="margin-top:32px;">
+        <div class="courier-card" onclick="window.location.hash='#history-tcs'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(220,38,38,.15);color:#ef4444;">📦</div>
+          <div class="courier-info">
+            <div class="name">TCS</div>
+            <div class="status">● Connected</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-leopards'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(0,230,118,.12);color:var(--green);">🐆</div>
+          <div class="courier-info">
+            <div class="name">Leopards</div>
+            <div class="status">● Connected</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-trax'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(0,188,212,.12);color:var(--teal);">✈️</div>
+          <div class="courier-info">
+            <div class="name">Trax</div>
+            <div class="status">● Connected</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-mnp'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(251,191,36,.12);color:var(--gold);">🚚</div>
+          <div class="courier-info">
+            <div class="name">M&amp;P</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-callcourier'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(168,85,247,.12);color:#a855f7;">📞</div>
+          <div class="courier-info">
+            <div class="name">Call Courier</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-blueex'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(59,130,246,.12);color:#3b82f6;">💙</div>
+          <div class="courier-info">
+            <div class="name">BlueEx</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-postex'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(0,230,118,.12);color:var(--green);">💰</div>
+          <div class="courier-info">
+            <div class="name">PostEx</div>
+            <div class="status">● COD Specialist</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-daewoo'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(245,158,11,.12);color:#f59e0b;">🚌</div>
+          <div class="courier-info">
+            <div class="name">Daewoo</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-daraz'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(239,68,68,.12);color:#ef4444;">🛒</div>
+          <div class="courier-info">
+            <div class="name">Daraz DEX</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-blinkex'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(0,188,212,.12);color:var(--teal);">⚡</div>
+          <div class="courier-info">
+            <div class="name">BlinkEx</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-smartlane'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(99,102,241,.12);color:#6366f1;">🛣️</div>
+          <div class="courier-info">
+            <div class="name">Smartlane</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+        <div class="courier-card" onclick="window.location.hash='#history-bouraq'" style="cursor:pointer;">
+          <div class="courier-icon" style="background:rgba(251,191,36,.12);color:var(--gold);">🦅</div>
+          <div class="courier-info">
+            <div class="name">Bouraq Express</div>
+            <div class="status">● Available</div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted);">🔗 50+ Couriers Supported &amp;
+        Growing</div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="modules" style="background:var(--bg);padding:56px 24px;">
+    <div class="container">
+      <div class="section-label">Features &amp; Modules</div>
+      <div class="section-title">Everything You Need to Ship Smarter</div>
+      <p class="section-sub" style="margin-bottom:40px;">Powerful tools built for Pakistani eCommerce — COD, bulk,
+        labels and more.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;">
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00e676';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,230,118,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''"
+          onclick="window.location.hash='#bookings'">
+          <div style="font-size:28px;margin-bottom:12px;">📦</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Shipment Bookings</div>
+          <div style="font-size:13px;color:var(--muted);">Process unfulfilled Shopify orders and generate courier
+            bookings in bulk.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00bcd4';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,188,212,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">🔗</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Multi Couriers</div>
+          <div style="font-size:13px;color:var(--muted);">Connect your own courier accounts — 50+ Pakistani couriers
+            supported.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#7c3aed';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(124,58,237,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📡</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Live Tracking</div>
+          <div style="font-size:13px;color:var(--muted);">Auto-sync latest shipment updates to Shopify and display on
+            order page.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#fbbf24';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(251,191,36,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📊</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Courier Performance</div>
+          <div style="font-size:13px;color:var(--muted);">City-wise delivery stats to help manage shipments and returns
+            efficiently.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00e676';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,230,118,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">🏷️</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Branded Labels</div>
+          <div style="font-size:13px;color:var(--muted);">Print courier labels with store logo in A4, A5, thermal &amp;
+            invoice formats.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00bcd4';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,188,212,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📋</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Courier Logs</div>
+          <div style="font-size:13px;color:var(--muted);">Browse by filters &amp; parcel status: booked, in transit,
+            delivered, returned.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(245,158,11,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📄</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Loadsheet &amp; Scanner</div>
+          <div style="font-size:13px;color:var(--muted);">Generate courier loadsheets to track parcels, reduce loss and
+            fraud.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#a855f7';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(168,85,247,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">🗺️</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Tracking Page</div>
+          <div style="font-size:13px;color:var(--muted);">Branded tracking page for customers to view live parcel status
+            updates.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00e676';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,230,118,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">🛵</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Self Riders</div>
+          <div style="font-size:13px;color:var(--muted);">Manage your own delivery riders and shipments for local
+            deliveries.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#3b82f6';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(59,130,246,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📈</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Analytics &amp; Report</div>
+          <div style="font-size:13px;color:var(--muted);">Improve courier operations with smarter tracking workflows and
+            filters.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#00bcd4';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(0,188,212,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">📍</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Multi Pickups</div>
+          <div style="font-size:13px;color:var(--muted);">Add and manage multiple pickup points to streamline
+            dispatches.</div>
+        </div>
+        <div class="feat-card"
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:.25s;cursor:pointer;"
+          onmouseover="this.style.borderColor='#fbbf24';this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(251,191,36,.12)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:28px;margin-bottom:12px;">🔍</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Scan &amp; Dispatch</div>
+          <div style="font-size:13px;color:var(--muted);">Verify items with scanning to prevent packing mistakes and
+            errors.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section id="plans" style="background:var(--surface);padding:56px 24px;">
+    <div class="container">
+      <div class="section-label" style="text-align:center;">Pricing</div>
+      <div class="section-title" style="text-align:center;">Pricing &amp; Plans</div>
+      <p style="text-align:center;color:var(--text);font-size:16px;margin-bottom:12px;">Before purchasing a plan, we recommend reviewing all the tutorial videos available in the Guides section.</p>
+      <p style="text-align:center;color:var(--muted);font-size:14px;margin-bottom:40px;">– If you need any assistance, feel free to contact us on WhatsApp at:
+        <strong style="color:var(--green);">+923334291329</strong>
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px;align-items:stretch;">
+
+        <!-- Free -->
+        <div
+          style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;gap:16px;transition:.25s;"
+          onmouseover="this.style.borderColor='#64748b';this.style.transform='translateY(-4px)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">
+            Trial</div>
+          <div style="font-size:42px;font-weight:900;color:var(--text);">$0</div>
+          <div style="font-size:12px;color:var(--muted);">Free forever. No card needed.</div>
+          <ul
+            style="list-style:none;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px;flex:1;">
+            <li>✅ 7 Orders / Day</li>
+            <li>✅ Resets Daily</li>
+            <li>✅ All Features Included</li>
+            <li>✅ Support Available</li>
+          </ul>
+          <button
+            style="background:#334155;color:#94a3b8;padding:12px;border-radius:10px;border:none;font-weight:600;font-size:13px;cursor:not-allowed;width:100%;">Currently
+            Active</button>
+        </div>
+
+        <!-- Pro -->
+        <div
+          style="background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,188,212,.08));border:1px solid rgba(0,230,118,.3);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;gap:16px;position:relative;transition:.25s;"
+          onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(0,230,118,.2)'"
+          onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div
+            style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),var(--teal));color:#000;padding:4px 16px;border-radius:999px;font-size:11px;font-weight:700;">
+            MOST POPULAR</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;">
+            Pro</div>
+          <div style="font-size:42px;font-weight:900;color:var(--text);">$4<span
+              style="font-size:16px;color:var(--muted);font-weight:400;">/30 days</span></div>
+          <div style="font-size:12px;color:var(--muted);">Best for growing stores.</div>
+          <ul
+            style="list-style:none;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px;flex:1;">
+            <li style="color:var(--text);">✅ 1,000 Bookings</li>
+            <li style="color:var(--text);">✅ 30-Day Validity</li>
+            <li>✅ All Features Included</li>
+            <li>✅ Unused Credits Carry Over</li>
+            <li>✅ Priority Support</li>
+          </ul>
+          <button
+            style="background:linear-gradient(135deg,var(--green),var(--teal));color:#000;padding:12px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;width:100%;transition:.2s;"
+            onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">Buy Now →</button>
+        </div>
+
+        <!-- Ultimate -->
+        <div
+          style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(168,85,247,.08));border:1px solid rgba(124,58,237,.3);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;gap:16px;transition:.25s;"
+          onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(124,58,237,.2)'"
+          onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:13px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:1px;">
+            Ultimate</div>
+          <div style="font-size:42px;font-weight:900;color:var(--text);">$20<span
+              style="font-size:16px;color:var(--muted);font-weight:400;">/12 months</span></div>
+          <div style="font-size:12px;color:var(--muted);">Best value for high-volume stores.</div>
+          <ul
+            style="list-style:none;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px;flex:1;">
+            <li style="color:var(--text);">✅ Unlimited Bookings</li>
+            <li style="color:var(--text);">✅ 12-Month Validity</li>
+            <li>✅ All Features Included</li>
+            <li>✅ Unused Credits Carry Over</li>
+            <li>✅ Priority Support</li>
+          </ul>
+          <button
+            style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:12px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;width:100%;transition:.2s;"
+            onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">Buy Now →</button>
+        </div>
+
+        <!-- Enterprise -->
+        <div
+          style="background:linear-gradient(135deg,rgba(251,191,36,.06),rgba(245,158,11,.06));border:1px solid rgba(251,191,36,.2);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;gap:16px;transition:.25s;"
+          onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(251,191,36,.15)'"
+          onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">
+            Enterprise</div>
+          <div>
+            <div style="font-size:14px;color:var(--muted);text-decoration:line-through;">Rs 10,000/-</div>
+            <div style="font-size:36px;font-weight:900;color:var(--text);">Rs 5,000<span
+                style="font-size:14px;color:var(--gold);font-weight:600;"> 50% OFF</span></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);">For large-scale operations.</div>
+          <ul
+            style="list-style:none;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px;flex:1;">
+            <li style="color:var(--text);">✅ Unlimited Bookings</li>
+            <li style="color:var(--text);">✅ 12-Month Validity</li>
+            <li>✅ All Features Included</li>
+            <li>✅ Dedicated Support</li>
+            <li>✅ Custom Onboarding</li>
+          </ul>
+          <button
+            style="background:linear-gradient(135deg,#f59e0b,var(--gold));color:#000;padding:12px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;width:100%;transition:.2s;"
+            onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">Contact Us</button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <div
+    style="background:linear-gradient(135deg,rgba(0,230,118,.1),rgba(0,188,212,.1));border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:28px 24px;">
+    <div class="container">
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:40px;text-align:center;">
+        <div>
+          <div style="font-size:32px;font-weight:900;color:var(--green);">50+</div>
+          <div style="font-size:13px;color:var(--muted);">Couriers Supported</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:900;color:var(--teal);">10K+</div>
+          <div style="font-size:13px;color:var(--muted);">Orders Processed</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:900;color:var(--gold);">500+</div>
+          <div style="font-size:13px;color:var(--muted);">Merchants Using MMC</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:900;color:#a855f7;">99.9%</div>
+          <div style="font-size:13px;color:var(--muted);">Uptime SLA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer style="background:var(--surface);border-top:1px solid var(--border);padding:40px 24px;">
+    <div class="container">
+      <div style="display:flex;flex-wrap:wrap;gap:40px;justify-content:space-between;">
+        <div style="max-width:300px;">
+          <div
+            style="font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--green),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;">
+            MMC – Manage Multi Couriers</div>
+          <p style="color:var(--muted);font-size:13px;line-height:1.7;">Pakistan's #1 Shopify courier management app.
+            Connect all your courier accounts and automate your entire shipping workflow from one dashboard.</p>
+          <div style="margin-top:16px;font-size:13px;color:var(--muted);">📱 WhatsApp: <a
+              href="https://wa.me/923334291329" style="color:var(--green);">+923334291329</a></div>
+        </div>
+        <div>
+          <div style="font-weight:700;margin-bottom:14px;font-size:14px;">Quick Links</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted);">
+            <a href="#dashboard" style="color:var(--muted);" onmouseover="this.style.color='var(--green)'"
+              onmouseout="this.style.color='var(--muted)'">Dashboard</a>
+            <a href="#modules" style="color:var(--muted);" onmouseover="this.style.color='var(--green)'"
+              onmouseout="this.style.color='var(--muted)'">Features</a>
+            <a href="#plans" style="color:var(--muted);" onmouseover="this.style.color='var(--green)'"
+              onmouseout="this.style.color='var(--muted)'">Pricing Plans</a>
+            <a href="#couriers" style="color:var(--muted);" onmouseover="this.style.color='var(--green)'"
+              onmouseout="this.style.color='var(--muted)'">Courier Network</a>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;margin-bottom:14px;font-size:14px;">Supported Couriers</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted);">
+            <span>TCS | Leopards | Trax</span>
+            <span>M&amp;P | Call Courier | BlueEx</span>
+            <span>PostEx | Daewoo | Daraz DEX</span>
+            <span>BlinkEx | Smartlane | Bouraq</span>
+            <span style="color:var(--green);">+ 38 more couriers</span>
+          </div>
+        </div>
+      </div>
+      <div
+        style="border-top:1px solid var(--border);margin-top:32px;padding-top:20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div style="font-size:12px;color:var(--muted);">© 2025 MMC – Manage Multi Couriers. Built for Pakistani
+          eCommerce.</div>
+        <div style="font-size:12px;color:var(--muted);">Powered by Shopify App Platform</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ══════════════════════════════
+       THEME ENGINE
+    ══════════════════════════════ */
+    const THEME_KEY = 'mmc_theme';
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const ICONS = {
+      dark: '<circle cx="12" cy="12" r="4"/><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/>',
+      light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+      system: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'
+    };
+    const LABELS = { dark: 'Dark', light: 'Light', system: 'System' };
+
+    function applyTheme(pref) {
+      const resolved = (pref === 'system') ? (sysDark.matches ? 'dark' : 'light') : pref;
+      document.documentElement.setAttribute('data-theme', resolved);
+      // update button
+      document.getElementById('themeIcon').innerHTML = ICONS[pref];
+      document.getElementById('themeBtnLabel').textContent = LABELS[pref];
+      // update selected option highlight
+      ['dark', 'light', 'system'].forEach(t => {
+        const el = document.getElementById('opt-' + t);
+        if (el) el.classList.toggle('selected', t === pref);
+      });
+    }
+
+    function setTheme(pref) {
+      localStorage.setItem(THEME_KEY, pref);
+      applyTheme(pref);
+      closeThemeMenu();
+    }
+
+
+
+    // React to OS preference changes when in system mode
+    sysDark.addEventListener('change', () => {
+      if ((localStorage.getItem(THEME_KEY) || 'system') === 'system') applyTheme('system');
+    });
+
+    // Init on load — default: system
+    (function init() {
+      const saved = localStorage.getItem(THEME_KEY) || 'system';
+      applyTheme(saved);
+    })();
+
+    /* ══════════════════════════════
+       NAV ACTIVE STATE
+    ══════════════════════════════ */
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', function () {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+    const navLinks = document.querySelectorAll('.nav-link');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.getAttribute('id');
+          navLinks.forEach(l => {
+            l.classList.remove('active');
+            if (l.getAttribute('href') === '#' + id) l.classList.add('active');
+          });
+        }
+      });
+    }, { threshold: 0.4 });
+    document.querySelectorAll('section').forEach(s => observer.observe(s));
+  </script>
+<script defer src="/bundle.js"></script></body>
+
+</html>
