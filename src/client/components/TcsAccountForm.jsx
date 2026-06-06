@@ -158,13 +158,11 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
       });
       const data = await resp.json();
       if (data.success) {
-        setPickups(data.data.pickups || []);
-        if (data.data.pickups?.length > 0) {
-          setSelectedPickup(data.data.pickups[0].id);
+        if (data.data.accessToken) {
+          setAccessToken(data.data.accessToken);
         }
-        setAccessToken(data.data.accessToken || '');
         setIsValidated(true);
-        alert('Validation Successful! Pickup addresses loaded.');
+        alert('Validation Successful! You can now save your settings.');
       } else {
         alert('Validation failed: ' + data.error);
         setIsValidated(false);
@@ -177,6 +175,10 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
   };
 
   const saveAccount = async () => {
+    if (!initialData && (!username || !password || !accountNumber)) {
+      alert("Please provide Username, Password, and Account Number.");
+      return;
+    }
     if (insuranceOn && !insuranceAmount) {
       alert("Please provide the Default Insurance value since Insurance is enabled.");
       return;
@@ -289,11 +291,14 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
         
         <div style={styles.row}>
           <div style={styles.col}>
-            <label style={styles.label}>Pickup Address / Cost Center</label>
-            <select style={styles.input} value={selectedPickup} onChange={e => setSelectedPickup(e.target.value)}>
-              {pickups.length === 0 && <option value="">Validate to load pickups...</option>}
-              {pickups.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <label style={styles.label}>Pickup Address / Cost Center Code *</label>
+            <input 
+              style={styles.input} 
+              type="text" 
+              value={selectedPickup} 
+              onChange={e => setSelectedPickup(e.target.value)} 
+              placeholder="e.g. LHR-01" 
+            />
           </div>
           <div style={styles.col}>
             <label style={styles.label}>Default Weight (Kg) *</label>

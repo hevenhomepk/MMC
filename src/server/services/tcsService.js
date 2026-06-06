@@ -45,17 +45,13 @@ async function validateAndFetchPickups({ username, password, accountNumber }) {
     return { pickups: response.data };
     */
     
-    // Simulating successful validation and fetching of cost centers
+    // Simulating successful validation
     if (!username || !password || !accountNumber) {
         throw new Error("Missing credentials");
     }
 
     return {
-      accessToken: 'mock_jwt_access_token_' + Math.floor(Math.random() * 100000), // Simulated token
-      pickups: [
-        { id: 'RANA-01', name: 'RANA - 03331234567 - Pickup Address 1' },
-        { id: 'RANA-02', name: 'RANA - 03331234567 - Pickup Address 2' }
-      ]
+      accessToken: 'mock_jwt_access_token_' + Math.floor(Math.random() * 100000) // Simulated token
     };
   } catch (err) {
     console.error('Validation error:', err);
