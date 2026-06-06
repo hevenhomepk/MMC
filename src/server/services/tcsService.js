@@ -25,36 +25,25 @@ function decrypt(encryptedText) {
   return decrypted;
 }
 
-// Fixed token provided by user for DEV API
-const DEV_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjpbIlRyYWNrIiwiRWNvbSIsIk5vdGlmaWNhdGlvbiJdLCJjbGllbnRpZCI6IjIxNTYxMDU1MiIsInNlcnZpY2VzIjoiMTAzLDE1NSwxNjEsMTY0LDIyNSwyNDcsMjQ4LDI0OSwyNTAsMjUxLDI3NywyOTMsNDQ4LDQ0OSw0NTAsNDUxLDQ1Miw0NTMsNDU0LDEwMTAiLCJleGNsdWRlZC1zZXJ2aWNlcyI6IiIsImlzcyI6InVhdC1taWRkbGV3YXJlLnRyYW56dW1way5jb20iLCJqdGkiOiI4MzMzNDRiNC0zNDQ0LTRhY2EtODhhNi1lN2VlNWQ3NGYzMzEiLCJuYmYiOjE3NTMwOTY3NTAsImV4cCI6MTgzOTQ5Njc1MCwiaWF0IjoxNzUzMDk2NzUwfQ.DIx4XCcda3QuVrp0HVaE7DB9Gz6eMn4d_jPUsFG16V0';
+const TCS_BASE_URL = 'https://ociconnect.tcscourier.com/ecom/api';
 
 async function validateAndFetchPickups({ username, password, accountNumber }) {
-  // Since the specific endpoint to fetch cost centers wasn't provided, we simulate the API call.
-  // In production, this would make an axios call with the Bearer token.
   try {
-    /* 
-    // Example of actual call:
-    const response = await axios.get('https://devconnect.tcscourier.com/api/costCenters', {
-      headers: {
-        'Authorization': `Bearer ${DEV_TOKEN}`,
-        'X-Username': username,
-        'X-Password': password,
-        'X-AccountNumber': accountNumber
-      }
-    });
-    return { pickups: response.data };
-    */
-    
-    // Simulating successful validation
     if (!username || !password || !accountNumber) {
         throw new Error("Missing credentials");
     }
 
+    // Try to get a token to validate credentials
+    const response = await axios.post(`${TCS_BASE_URL}/authentication/token`, {
+      username: username,
+      password: password
+    });
+
     return {
-      accessToken: 'mock_jwt_access_token_' + Math.floor(Math.random() * 100000) // Simulated token
+      accessToken: response.data?.accesstoken || response.data?.token || 'validated_mock_token_if_empty'
     };
   } catch (err) {
-    console.error('Validation error:', err);
+    console.error('Validation error:', err.response ? err.response.data : err.message);
     throw new Error('Failed to validate credentials with TCS API.');
   }
 }
@@ -154,30 +143,80 @@ async function bookShipment(payload) {
     throw new Error(`Order #${orderId} is already booked with ${existingBooking.courier} (CN: ${existingBooking.tracking_number}).`);
   }
 
-  // In a real implementation, we would now map 'bookingDetails' and 'account' 
-  // credentials into a TCS API request, such as POST https://devconnect.tcscourier.com/api/shipment
+  try {
+    // 1. Get Authentication Token
+    let token = account.access_token;
+    if (!token || token.startsWith('mock_')) {
+      const authRes = await axios.post(`${TCS_BASE_URL}/authentication/token`, {
+        username: account.username,
+        password: decrypt(account.password)
+      });
+      token = authRes.data?.accesstoken || authRes.data?.token;
+      if (!token) throw new Error("Could not retrieve access token from TCS.");
+    }
 
-  // Simulate TCS API call delay
-  await new Promise(resolve => setTimeout(resolve, 800));
+    // 2. Build TCS Payload
+    const tcsPayload = {
+      accesstoken: token,
+      tcsaccount: account.account_number,
+      consignmentno: null,
+      shipmentDetails: {
+        shipperName: shop,
+        shipperPhone: "", 
+        shipperAddress: account.pickup_address || "Default Address",
+        consigneeName: bookingDetails.consigneeName,
+        consigneePhone: bookingDetails.consigneePhone,
+        consigneeAddress: bookingDetails.consigneeAddress || "Not Provided",
+        destinationCity: bookingDetails.consigneeCity,
+        weight: parseFloat(account.default_weight) || 0.5,
+        pieces: parseInt(bookingDetails.pieces) || 1,
+        codAmount: parseFloat(bookingDetails.codAmount) || 0,
+        customerReferenceNo: orderId,
+        services: account.service_type || "Express",
+        remarks: account.shipper_remarks || "",
+        insuranceValue: account.has_insurance ? (account.default_insurance || 0) : 0,
+        fragile: account.is_fragile ? "Yes" : "No"
+      }
+    };
 
-  // Simulate success with a generated tracking number
-  const trackingNumber = 'TCS-' + Math.floor(Math.random() * 1000000000);
+    // 3. Make the API Call to create booking
+    const response = await axios.post(`${TCS_BASE_URL}/booking/create`, tcsPayload, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-  // Save to database for logs
-  await bookingService.saveBooking({
-    shop,
-    orderId: bookingDetails.orderId,
-    courier: 'TCS',
-    trackingNumber: trackingNumber,
-    consigneeName: bookingDetails.consigneeName,
-    consigneePhone: bookingDetails.consigneePhone,
-    consigneeCity: bookingDetails.consigneeCity,
-    codAmount: parseFloat(bookingDetails.codAmount),
-    orderAmount: parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
-    accountId: accountId
-  });
+    const data = response.data;
+    if (!data || data.error) {
+      throw new Error(data?.message || data?.error || "Failed to create booking on TCS.");
+    }
 
-  return { success: true, trackingNumber };
+    const trackingNumber = data.consignmentno || data.trackingNumber || data.cn;
+
+    if (!trackingNumber) {
+       throw new Error("TCS API responded with success but tracking number was missing.");
+    }
+
+    // Save to database for logs
+    await bookingService.saveBooking({
+      shop,
+      orderId: bookingDetails.orderId,
+      courier: 'TCS',
+      trackingNumber: trackingNumber,
+      consigneeName: bookingDetails.consigneeName,
+      consigneePhone: bookingDetails.consigneePhone,
+      consigneeCity: bookingDetails.consigneeCity,
+      codAmount: parseFloat(bookingDetails.codAmount),
+      orderAmount: parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
+      accountId: accountId
+    });
+
+    return { success: true, trackingNumber };
+  } catch (error) {
+    console.error('TCS Booking Error:', error.response?.data || error.message);
+    throw new Error('Failed to book shipment with TCS: ' + (error.response?.data?.message || error.message));
+  }
 }
 
 async function deleteAccount(id, shop) {
@@ -207,11 +246,19 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
     throw new Error('No active TCS account found.');
   }
 
-  const token = activeAccount.access_token || DEV_TOKEN;
+  let token = activeAccount.access_token;
   const customerno = activeAccount.account_number;
 
   try {
-    const response = await axios.get('https://devconnect.tcscourier.com/ecom/api/report/loadsheetlogs', {
+    if (!token || token.startsWith('mock_')) {
+      const authRes = await axios.post(`${TCS_BASE_URL}/authentication/token`, {
+        username: activeAccount.username,
+        password: decrypt(activeAccount.password)
+      });
+      token = authRes.data?.accesstoken || authRes.data?.token;
+    }
+
+    const response = await axios.get(`${TCS_BASE_URL}/report/loadsheetlogs`, {
       headers: {
         'Authorization': `Bearer ${token}`
       },
