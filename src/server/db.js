@@ -125,11 +125,11 @@ const initDB = async () => {
 
   try {
     await pool.query(createTableQuery);
-    await pool.query(alterTableQuery);
     await pool.query(createPostExTableQuery);
     await pool.query(createBookingsTableQuery);
     await pool.query(createLoadsheetsTableQuery);
     await pool.query(createReturnSheetsTableQuery);
+    await pool.query(alterTableQuery);
     console.log('Database initialized: all tables ready.');
   } catch (err) {
     console.error('Error initializing database:', err.message);
