@@ -1,12 +1,18 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'postgres',
-  password: '123456',
-  port: 5432,
-});
+// Use DATABASE_URL (Render/Heroku standard) or fall back to individual env vars
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // required for Render's managed PostgreSQL
+    })
+  : new Pool({
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'postgres',
+      password: process.env.DB_PASSWORD || '123456',
+      port: parseInt(process.env.DB_PORT || '5432'),
+    });
 
 const initDB = async () => {
   const createTableQuery = `
@@ -126,7 +132,8 @@ const initDB = async () => {
     await pool.query(createReturnSheetsTableQuery);
     console.log('Database initialized: all tables ready.');
   } catch (err) {
-    console.error('Error initializing database:', err);
+    console.error('Error initializing database:', err.message);
+    // Don't exit — the server will still serve static files even if DB is unavailable
   }
 };
 

@@ -1,0 +1,22 @@
+# Dependencies - never commit these, Render installs them
+node_modules/
+
+# Environment variables - NEVER commit secrets
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build artifacts - keep dist/ committed so Render has the frontend
+# dist/   <-- intentionally NOT ignored so GitHub has the built frontend
