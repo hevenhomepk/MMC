@@ -1,55 +1,9 @@
 // src/server/services/shopifyService.js
 const db    = require('../db');
 const axios = require('axios');
-const path  = require('path');
+const dotenv = require('dotenv');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Access-token helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Read the Shopify OAuth access token for a given shop from the Prisma-managed
- * SQLite session store (mmc/prisma/dev.sqlite).
- *
- * The Shopify session library stores offline tokens with:
- *   id   = "offline_<shop>"   (preferred)
- *   shop = "<shop>"           (fallback: most-recent row)
- *
- * @param {string} shop  e.g. "teststore.myshopify.com"
- * @returns {string|null}
- */
-function getAccessTokenFromSQLite(shop) {
-  try {
-    // Resolve the path relative to this file's location:
-    // this file  → src/server/services/shopifyService.js
-    // SQLite DB  → mmc/prisma/dev.sqlite  (3 dirs up, then mmc/prisma)
-    const dbPath = path.resolve(__dirname, '../../../mmc/prisma/dev.sqlite');
-
-    // Use better-sqlite3 if available (synchronous, no extra deps needed)
-    // eslint-disable-next-line global-require
-    const Database = require('better-sqlite3');
-    const sqlite   = new Database(dbPath, { readonly: true });
-
-    // 1️⃣  Prefer the offline-token row
-    let row = sqlite.prepare(
-      `SELECT accessToken FROM Session WHERE id = ? LIMIT 1`
-    ).get(`offline_${shop}`);
-
-    // 2️⃣  Fallback: latest row for the shop
-    if (!row) {
-      row = sqlite.prepare(
-        `SELECT accessToken FROM Session WHERE shop = ? ORDER BY rowid DESC LIMIT 1`
-      ).get(shop);
-    }
-
-    sqlite.close();
-    return row ? row.accessToken : null;
-
-  } catch (err) {
-    console.error('[shopifyService] SQLite token read failed:', err.message);
-    return null;
-  }
-}
+dotenv.config();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main export
@@ -57,11 +11,9 @@ function getAccessTokenFromSQLite(shop) {
 
 /**
  * Fetch all UNFULFILLED orders for a shop from the Shopify REST API.
+ * Uses a Custom App Access Token stored in the .env file.
  *
- * Intentionally does NOT filter by financial_status so that COD orders
- * (payment_status = "pending") are included alongside prepaid orders.
- *
- * @param {string} shop  Shopify store domain, e.g. "mystore.myshopify.com"
+ * @param {string} shop  Shopify store domain, e.g. "luxessentials-qwfswl1g.myshopify.com"
  * @returns {Promise<Object[]>}
  */
 async function getUnfulfilledOrders(shop) {
@@ -71,29 +23,25 @@ async function getUnfulfilledOrders(shop) {
       return [];
     }
 
-    // ── 1. Obtain the OAuth access token ─────────────────────────────────────
-    const accessToken = getAccessTokenFromSQLite(shop);
+    // ── 1. Obtain the Custom App Access Token from .env ──────────────────────
+    const accessToken = process.env.SHOPIFY_CUSTOM_APP_TOKEN;
 
     if (!accessToken) {
       console.error(
-        `[shopifyService] No Shopify access token found for "${shop}". ` +
-        'Please re-install (re-authenticate) the app to generate a new token.'
+        `[shopifyService] No SHOPIFY_CUSTOM_APP_TOKEN found in .env! ` +
+        'Please generate a Custom App token in Shopify Admin and add it to your .env file.'
       );
       return [];
     }
 
     // ── 2. Call the Shopify Orders REST API ───────────────────────────────────
-    //  ✅  fulfillment_status=unfulfilled  → correct param name
-    //  ✅  status=open                     → only active orders
-    //  ❌  financial_status NOT included   → COD orders always show "pending";
-    //                                        excluding them would hide all COD orders
     const response = await axios.get(
       `https://${shop}/admin/api/2025-01/orders.json`,
       {
         params: {
           fulfillment_status: 'unfulfilled',
           status:             'open',
-          limit:              250,          // maximum page size
+          limit:              250,
         },
         headers: {
           'X-Shopify-Access-Token': accessToken,
@@ -136,17 +84,15 @@ async function getUnfulfilledOrders(shop) {
         city:             shipping.city  || '',
         address:          fullAddress,
         email:            order.email || customer.email || '',
-        // COD amount: use total_price (financial_status is informational only)
         total_price:      order.current_total_price || order.total_price || '0.00',
         created_at:       order.created_at,
         line_items:       lineItemsDesc,
-        service_type:     'O',        // Default: Overnight
+        service_type:     'O',
         insurance:        '0.00',
         fragile:          false,
         weight:           weightKg > 0 ? weightKg : '0.5',
         pieces:           pieces.toString(),
         remarks:          order.note || '',
-        // Informational only — not used for filtering
         financial_status: order.financial_status || '',
       };
     });
