@@ -1,21 +1,22 @@
-const axios = require('axios');
+// test-tcs.js
+// Updated script to validate TCS credentials online and fetch pickup addresses via the tcsService.
 
-const DEV_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjpbIlRyYWNrIiwiRWNvbSIsIk5vdGlmaWNhdGlvbiJdLCJjbGllbnRpZCI6IjIxNTYxMDU1MiIsInNlcnZpY2VzIjoiMTAzLDE1NSwxNjEsMTY0LDIyNSwyNDcsMjQ4LDI0OSwyNTAsMjUxLDI3NywyOTMsNDQ4LDQ0OSw0NTAsNDUxLDQ1Miw0NTMsNDU0LDEwMTAiLCJleGNsdWRlZC1zZXJ2aWNlcyI6IiIsImlzcyI6InVhdC1taWRkbGV3YXJlLnRyYW56dW1way5jb20iLCJqdGkiOiI4MzMzNDRiNC0zNDQ0LTRhY2EtODhhNi1lN2VlNWQ3NGYzMzEiLCJuYmYiOjE3NTMwOTY3NTAsImV4cCI6MTgzOTQ5Njc1MCwiaWF0IjoxNzUzMDk2NzUwfQ.DIx4XCcda3QuVrp0HVaE7DB9Gz6eMn4d_jPUsFG16V0';
+const tcsService = require('./src/server/services/tcsService');
 
-async function test() {
+const credentials = {
+  username: 'testenvio',
+  password: 'abc123+',
+  accountNumber: '04011K1'
+};
+
+async function run() {
   try {
-    const response = await axios.get('https://devconnect.tcscourier.com/api/costCenters', {
-      headers: {
-        'Authorization': `Bearer ${DEV_TOKEN}`,
-        'X-Username': 'testenvio',
-        'X-Password': 'Password1',
-        'X-AccountNumber': '04011K1'
-      }
-    });
-    console.log(response.data);
+    const result = await tcsService.validateAndFetchPickups(credentials);
+    console.log('Validation successful. Received data:');
+    console.log(JSON.stringify(result, null, 2));
   } catch (err) {
-    console.error(err.response ? err.response.data : err.message);
+    console.error('Validation failed:', err.message);
   }
 }
 
-test();
+run();

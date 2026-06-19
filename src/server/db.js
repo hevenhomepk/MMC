@@ -45,6 +45,8 @@ const initDB = async () => {
 
   const alterTableQuery = `
     ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS access_token TEXT;
+    ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS pickup_addresses_data TEXT;
+    ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS consignee_phone VARCHAR(50);
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS loadsheet_id INTEGER;
     ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS total_amount DECIMAL(15,2) DEFAULT 0;
@@ -52,6 +54,63 @@ const initDB = async () => {
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_amount DECIMAL(15,2) DEFAULT 0;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_sheet_id INTEGER;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_status VARCHAR(50);
+  `;
+
+  // ── NEW: dedicated token store ───────────────────────────────────────────────
+  const createTcsTokensTableQuery = `
+    CREATE TABLE IF NOT EXISTS tcs_tokens (
+      id           SERIAL PRIMARY KEY,
+      username     VARCHAR(255) NOT NULL,
+      shop_domain  VARCHAR(255) NOT NULL,
+      access_token TEXT        NOT NULL,
+      token_type   VARCHAR(50)  DEFAULT 'Bearer',
+      issued_at    TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+      expires_at   TIMESTAMPTZ,
+      is_active    BOOLEAN      DEFAULT true,
+      created_at   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+      updated_at   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (username, shop_domain)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tcs_tokens_username ON tcs_tokens (username, shop_domain);
+    CREATE INDEX IF NOT EXISTS idx_tcs_tokens_expires  ON tcs_tokens (expires_at);
+  `;
+
+  // ── NEW: normalized pickup address rows ─────────────────────────────────────
+  const createPickupAddressesTableQuery = `
+    CREATE TABLE IF NOT EXISTS pickup_addresses (
+      id             SERIAL PRIMARY KEY,
+      account_id     INTEGER REFERENCES tcs_accounts(id) ON DELETE CASCADE,
+      address_id     VARCHAR(100),
+      address_line   TEXT,
+      city           VARCHAR(100),
+      state          VARCHAR(100),
+      zip            VARCHAR(20),
+      account_number VARCHAR(100) NOT NULL,
+      shop_domain    VARCHAR(255) NOT NULL,
+      loaded_at      TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (account_number, shop_domain, address_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pickup_acct ON pickup_addresses (account_number, shop_domain);
+  `;
+
+  // ── NEW: cost centers for UI dropdown ───────────────────────────────────────
+  const createCostCentersTableQuery = `
+    CREATE TABLE IF NOT EXISTS cost_centers (
+      id               SERIAL PRIMARY KEY,
+      costcentercode   VARCHAR(100) NOT NULL,
+      costcentername   VARCHAR(255),
+      costcentercity   VARCHAR(100),
+      pickup_address   TEXT,
+      return_address   TEXT,
+      phone            VARCHAR(50),
+      email            VARCHAR(255),
+      print_on_label   BOOLEAN      DEFAULT false,
+      account_number   VARCHAR(100) NOT NULL,
+      shop_domain      VARCHAR(255) NOT NULL,
+      loaded_at        TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (costcentercode, account_number, shop_domain)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cc_acct ON cost_centers (account_number, shop_domain);
   `;
 
   const createPostExTableQuery = `
@@ -130,6 +189,9 @@ const initDB = async () => {
     await pool.query(createLoadsheetsTableQuery);
     await pool.query(createReturnSheetsTableQuery);
     await pool.query(alterTableQuery);
+    await pool.query(createTcsTokensTableQuery);
+    await pool.query(createPickupAddressesTableQuery);
+    await pool.query(createCostCentersTableQuery);
     console.log('Database initialized: all tables ready.');
   } catch (err) {
     console.error('Error initializing database:', err.message);

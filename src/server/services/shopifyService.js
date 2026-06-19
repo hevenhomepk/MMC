@@ -1,84 +1,91 @@
 const db = require('../db');
+const axios = require('axios');
 
-// In real app, fetch from Shopify Admin API
 async function getUnfulfilledOrders(shop) {
-  // 1. Fetch raw orders from Shopify (Mocked here)
-  const rawOrders = [
-    {
-      id: 'gid://shopify/Order/123456789',
-      order_number: '#1024',
-      customer_name: 'Ali Khan',
-      mobile: '03001234567',
-      city: 'Lahore',
-      address: 'House 123, Street 4, Phase 5, DHA',
-      email: 'ali@example.com',
-      total_price: '2500.00',
-      created_at: '2026-05-10T10:00:00Z',
-      line_items: '2x Black T-Shirts',
-      service_type: 'O', // Overnight
-      insurance: '0.00',
-      fragile: false,
-      weight: '0.5',
-      pieces: '1',
-      remarks: 'Please call before delivery'
-    },
-    {
-      id: 'gid://shopify/Order/987654321',
-      order_number: '#1025',
-      customer_name: 'Sara Ahmed',
-      mobile: '03219876543',
-      city: 'Karachi',
-      address: 'Apartment 4B, Ocean View Towers',
-      email: 'sara@example.com',
-      total_price: '4800.00',
-      created_at: '2026-05-10T11:30:00Z',
-      line_items: '1x Designer Handbag',
-      service_type: 'O',
-      insurance: '100.00',
-      fragile: true,
-      weight: '1.2',
-      pieces: '1',
-      remarks: 'Handle with care'
-    },
-    {
-      id: 'gid://shopify/Order/456789123',
-      order_number: '#1026',
-      customer_name: 'Usman Malik',
-      mobile: '03335556677',
-      city: 'Islamabad',
-      address: 'Plot 15, Sector F-7',
-      email: 'usman@example.com',
-      total_price: '1200.00',
-      created_at: '2026-05-10T12:15:00Z',
-      line_items: '3x Cotton Socks',
-      service_type: 'O',
-      insurance: '0.00',
-      fragile: false,
-      weight: '0.3',
-      pieces: '1',
-      remarks: ''
-    }
-  ];
-
-  // 2. Cross-reference with our local bookings table to see if any are already booked
   try {
+    // Basic Auth using provided credentials
+    const username = 'hevenhomepk@gmail.com';
+    const password = 'Swkbv@15';
+    const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+    
+    // Explicitly use the requested Shopify store domain
+    const targetShop = 'codorders.myshopify.com';
+
+    // Make the API call to Shopify
+    // Note: Shopify typically uses X-Shopify-Access-Token, but since email/password were explicitly provided,
+    // we use Basic Auth. If this is a private app, the API Key goes in the username field.
+    const response = await axios.get(`https://${targetShop}/admin/api/2024-04/orders.json?status=unfulfilled`, {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const shopifyOrders = response.data.orders || [];
+
+    // Map Shopify order structure to our unified application structure
+    const rawOrders = shopifyOrders.map(order => {
+      const shipping = order.shipping_address || {};
+      const customer = order.customer || {};
+      
+      const firstName = shipping.first_name || customer.first_name || '';
+      const lastName = shipping.last_name || customer.last_name || '';
+      const fullName = shipping.name || `${firstName} ${lastName}`.trim();
+
+      const address1 = shipping.address1 || '';
+      const address2 = shipping.address2 || '';
+      const fullAddress = [address1, address2].filter(Boolean).join(', ');
+
+      const totalWeightGrams = order.total_weight || 0;
+      const weightKg = (totalWeightGrams / 1000).toFixed(2);
+      
+      const pieces = order.line_items ? order.line_items.reduce((acc, item) => acc + item.quantity, 0) : 1;
+      const lineItemsDesc = order.line_items ? order.line_items.map(i => `${i.quantity}x ${i.name}`).join(', ') : '';
+
+      return {
+        id: order.admin_graphql_api_id || `gid://shopify/Order/${order.id}`,
+        order_number: order.name || `#${order.order_number}`,
+        customer_name: fullName,
+        mobile: shipping.phone || customer.phone || '',
+        city: shipping.city || '',
+        address: fullAddress,
+        email: order.email || customer.email || '',
+        total_price: order.current_total_price || order.total_price || '0.00',
+        created_at: order.created_at,
+        line_items: lineItemsDesc,
+        service_type: 'O', // Default: Overnight
+        insurance: '0.00',
+        fragile: false,
+        weight: weightKg > 0 ? weightKg : '0.5',
+        pieces: pieces.toString(),
+        remarks: order.note || ''
+      };
+    });
+
+    // Cross-reference with our local bookings table to see if any are already booked
     const existingBookingsRes = await db.query(
       `SELECT order_id, tracking_number FROM bookings WHERE shop_domain = $1`,
       [shop]
     );
+    
     const bookedMap = {};
     existingBookingsRes.rows.forEach(row => {
       bookedMap[row.order_id] = row.tracking_number;
     });
 
-    // 3. Attach tracking number if found locally
+    // Attach tracking number if found locally
     return rawOrders.map(order => ({
       ...order,
       tracking_number: bookedMap[order.order_number] || null
     }));
+    
   } catch (error) {
-    console.error('Error cross-referencing orders with bookings:', error);
-    return rawOrders;
+    console.error('Error fetching orders from Shopify:', error.message);
+    if (error.response) {
+      console.error('Shopify API Error Response:', error.response.data);
+    }
+    // Return empty array on failure instead of crashing
+    return [];
   }
 }
 

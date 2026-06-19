@@ -10,24 +10,27 @@ const PAKISTAN_CITIES = [
   "Kohat", "Khanewal", "Dera Ismail Khan", "Gojra", "Mandi Bahauddin", "Abbottabad", "Turbat"
 ].sort();
 
-const ALL_COLUMNS = [
-  { key: 'order_number', label: 'Order #', type: 'text' },
-  { key: 'customer_name', label: 'Consignee', type: 'text' },
-  { key: 'mobile', label: 'Mobile', type: 'text' },
-  { key: 'city', label: 'City', type: 'city-dropdown' },
-  { key: 'address', label: 'Complete Address', type: 'textarea' },
-  { key: 'email', label: 'Email', type: 'text' },
+const MAIN_COLUMNS = [
+  { key: 'order_number', label: 'Order ID', type: 'text', readOnly: true },
+  { key: 'customer_name', label: 'Customer Name', type: 'text' },
+  { key: 'mobile', label: 'Customer Phone', type: 'text' },
+  { key: 'address', label: 'Customer Address', type: 'textarea' },
   { key: 'total_price', label: 'COD Amount', type: 'number' },
-  { key: 'service_type', label: 'Service', type: 'select', options: [{v:'O', l:'Overnight'}, {v:'2', l:'Second Day'}, {v:'E', l:'Economy'}] },
-  { key: 'weight', label: 'Weight (kg)', type: 'number' },
   { key: 'pieces', label: 'Pieces', type: 'number' },
+  { key: 'weight', label: 'Weight', type: 'number' },
+  { key: 'service_type', label: 'Service', type: 'select', options: [{v:'O', l:'Overnight'}, {v:'2', l:'Second Day'}, {v:'E', l:'Economy'}] },
+  { key: 'line_items', label: 'Product Details', type: 'textarea' },
+  { key: 'city', label: 'City', type: 'city-dropdown' }
+];
+
+const HIDDEN_COLUMNS = [
+  { key: 'email', label: 'Email', type: 'text' },
   { key: 'insurance', label: 'Insurance', type: 'number' },
   { key: 'fragile', label: 'Fragile', type: 'checkbox' },
   { key: 'remarks', label: 'Remarks', type: 'text' },
-  { key: 'created_at', label: 'Order Date', type: 'date', readOnly: true }
+  { key: 'created_at', label: 'Order Date', type: 'date', readOnly: true },
+  { key: 'tracking_number', label: 'Tracking', type: 'text', readOnly: true }
 ];
-
-const DEFAULT_COLUMNS = ['order_number', 'customer_name', 'mobile', 'city', 'address', 'total_price'];
 
 const styles = {
   table: {
@@ -142,11 +145,10 @@ export default function BookingWorkbench({ shop }) {
   // Search and Sort State
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('booking_workbench_columns_v7');
-    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
-  });
-  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const [expandedRows, setExpandedRows] = useState({});
+  const toggleRow = (id) => {
+    setExpandedRows(prev => ({...prev, [id]: !prev[id]}));
+  };
   
   const [isBooking, setIsBooking] = useState(false);
   const [bulkStatus, setBulkStatus] = useState(null);
@@ -185,9 +187,7 @@ export default function BookingWorkbench({ shop }) {
     fetchData();
   }, [shop]);
 
-  useEffect(() => {
-    localStorage.setItem('booking_workbench_columns_v7', JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+
 
   const filteredAccounts = accounts.filter(a => a.courier === selectedCourier);
 
@@ -290,7 +290,7 @@ export default function BookingWorkbench({ shop }) {
     return result;
   }, [orders, searchTerm, sortConfig]);
 
-  const activeColumns = ALL_COLUMNS.filter(col => visibleColumns.includes(col.key));
+
 
   const renderCell = (o, col) => {
     if (col.readOnly) {
@@ -392,26 +392,7 @@ export default function BookingWorkbench({ shop }) {
           </div>
           
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
-              <button 
-                style={{ ...styles.colBtn, borderColor: showColumnMenu ? 'var(--green)' : 'var(--border)', background: showColumnMenu ? 'rgba(0,230,118,0.05)' : 'var(--surface2)' }} 
-                onClick={() => setShowColumnMenu(!showColumnMenu)}
-              >
-                <span>⚙️ Columns</span>
-                <span style={{ transform: showColumnMenu ? 'rotate(180deg)' : 'none', transition: '.3s' }}>▼</span>
-              </button>
-              
-              {showColumnMenu && (
-                <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 12px 32px rgba(0,0,0,0.15)', zIndex: 100, minWidth: '320px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {ALL_COLUMNS.map(col => (
-                    <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      <input type="checkbox" checked={visibleColumns.includes(col.key)} onChange={() => setVisibleColumns(prev => prev.includes(col.key) ? prev.filter(k => k !== col.key) : [...prev, col.key])} />
-                      {col.label}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
+
 
             <button 
               style={{ ...styles.btnPrimary, opacity: (selectedOrderIds.length === 0 || isBooking) ? 0.6 : 1, minWidth: '180px' }} 
@@ -451,25 +432,49 @@ export default function BookingWorkbench({ shop }) {
                     setSelectedOrderIds(allSelected ? prev => prev.filter(id => !currentIds.includes(id)) : prev => [...new Set([...prev, ...currentIds])]);
                   }} />
                 </th>
-                {activeColumns.map(col => (
+                {MAIN_COLUMNS.map(col => (
                   <th key={col.key} style={styles.th} onClick={() => setSortConfig({ key: col.key, direction: sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}>
                     {col.label} {sortConfig.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
                   </th>
                 ))}
+                <th style={{ ...styles.th, width: '40px', textAlign: 'center' }}>More</th>
               </tr>
             </thead>
             <tbody>
               {filteredAndSortedOrders.map(o => (
-                <tr key={o.id} style={{ background: selectedOrderIds.includes(o.id) ? 'rgba(59,130,246,0.02)' : 'transparent' }}>
-                  <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
-                    <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => toggleSelectOrder(o.id)} />
-                  </td>
-                  {activeColumns.map(col => (
-                    <td key={col.key} style={{ ...styles.td, width: col.key === 'address' ? '280px' : 'auto' }}>
-                      {renderCell(o, col)}
+                <React.Fragment key={o.id}>
+                  <tr style={{ background: selectedOrderIds.includes(o.id) ? 'rgba(59,130,246,0.02)' : 'transparent' }}>
+                    <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
+                      <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => toggleSelectOrder(o.id)} />
                     </td>
-                  ))}
-                </tr>
+                    {MAIN_COLUMNS.map(col => (
+                      <td key={col.key} style={{ ...styles.td, width: col.key === 'address' || col.key === 'line_items' ? '200px' : 'auto' }}>
+                        {renderCell(o, col)}
+                      </td>
+                    ))}
+                    <td style={{ ...styles.td, textAlign: 'center', verticalAlign: 'middle' }}>
+                      <button onClick={() => toggleRow(o.id)} style={{ background: 'var(--surface2, #f1f5f9)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '16px', padding: '4px 10px', color: 'var(--muted)' }}>
+                        ...
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedRows[o.id] && (
+                    <tr style={{ background: 'var(--surface2, #f8fafc)' }}>
+                      <td colSpan={MAIN_COLUMNS.length + 2} style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                          {HIDDEN_COLUMNS.map(col => (
+                            <div key={col.key}>
+                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: 'var(--muted)', marginBottom: '4px', textTransform: 'uppercase' }}>{col.label}</label>
+                              <div style={{ background: '#fff', borderRadius: '6px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                {renderCell(o, col)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

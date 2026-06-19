@@ -1,190 +1,392 @@
 // src/client/components/TcsAccountForm.jsx
 import React, { useState } from 'react';
 
-const styles = {
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
+const s = {
   container: {
-    maxWidth: '800px',
+    maxWidth: '820px',
     margin: '40px auto',
-    padding: '30px',
+    padding: '32px',
     background: 'var(--surface, #ffffff)',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+    borderRadius: '14px',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
     border: '1px solid var(--border, #e2e8f0)',
     fontFamily: "'Inter', sans-serif",
-    color: 'var(--text, #0f172a)'
+    color: 'var(--text, #0f172a)',
   },
   title: {
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: '700',
-    marginBottom: '20px',
+    marginBottom: '24px',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '10px',
   },
   section: {
-    marginBottom: '24px',
+    marginBottom: '20px',
     padding: '20px',
     background: 'var(--surface2, #f8fafc)',
-    borderRadius: '8px',
-    border: '1px solid var(--border, #e2e8f0)'
+    borderRadius: '10px',
+    border: '1px solid var(--border, #e2e8f0)',
   },
-  row: {
-    display: 'flex',
-    gap: '20px',
-    marginBottom: '16px',
-    flexWrap: 'wrap'
-  },
-  col: {
-    flex: 1,
-    minWidth: '200px'
-  },
-  label: {
-    display: 'block',
+  sectionHeading: {
     fontSize: '13px',
-    fontWeight: '600',
-    marginBottom: '6px',
-    color: 'var(--muted, #64748b)'
+    fontWeight: '700',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#3b82f6',
+    marginBottom: '16px',
   },
+  row: { display: 'flex', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' },
+  col: { flex: 1, minWidth: '200px' },
+  label: { display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '5px', color: 'var(--muted, #64748b)' },
   input: {
     width: '100%',
-    padding: '10px 12px',
-    borderRadius: '6px',
+    padding: '9px 11px',
+    borderRadius: '7px',
     border: '1px solid var(--border, #cbd5e1)',
     background: 'var(--card, #ffffff)',
     color: 'var(--text, #0f172a)',
     fontSize: '14px',
     outline: 'none',
-    transition: 'border-color 0.2s'
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s',
   },
-  button: {
-    padding: '10px 20px',
-    borderRadius: '6px',
+  primaryBtn: {
+    padding: '10px 22px',
+    borderRadius: '7px',
     border: 'none',
-    background: 'linear-gradient(135deg, #3b82f6, #2563eb)', // Blue for validate/save
+    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
     color: '#fff',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'opacity 0.2s'
+    transition: 'opacity 0.2s, transform 0.1s',
   },
-  toggleContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    cursor: 'pointer'
-  },
-  toggleTrack: (isOn) => ({
-    width: '44px',
-    height: '24px',
-    borderRadius: '12px',
-    background: isOn ? '#3b82f6' : '#cbd5e1',
-    position: 'relative',
-    transition: 'background 0.3s'
+  ghostBtn: (color = '#3b82f6') => ({
+    padding: '7px 14px',
+    borderRadius: '7px',
+    border: `1px solid ${color}`,
+    background: 'transparent',
+    color,
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
   }),
-  toggleThumb: (isOn) => ({
-    width: '18px',
-    height: '18px',
-    borderRadius: '50%',
-    background: '#ffffff',
-    position: 'absolute',
-    top: '3px',
-    left: isOn ? '23px' : '3px',
-    transition: 'left 0.3s',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+  toggleContainer: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' },
+  toggleTrack: (on) => ({
+    width: '42px', height: '23px', borderRadius: '12px',
+    background: on ? '#3b82f6' : '#cbd5e1',
+    position: 'relative', flexShrink: 0, transition: 'background 0.25s',
   }),
-  grid2Col: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px'
-  }
+  toggleThumb: (on) => ({
+    width: '17px', height: '17px', borderRadius: '50%', background: '#fff',
+    position: 'absolute', top: '3px', left: on ? '22px' : '3px',
+    transition: 'left 0.25s', boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+  }),
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' },
 };
 
-export const Toggle = ({ label, checked, onChange, onText = "Yes", offText = "No", hideText = false }) => (
-  <div style={styles.toggleContainer} onClick={() => onChange(!checked)}>
-    <div style={styles.toggleTrack(checked)}>
-      <div style={styles.toggleThumb(checked)} />
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const Toggle = ({ label, checked, onChange, onText = 'Yes', offText = 'No', hideText = false }) => (
+  <div style={s.toggleContainer} onClick={() => onChange(!checked)}>
+    <div style={s.toggleTrack(checked)}>
+      <div style={s.toggleThumb(checked)} />
     </div>
     <span style={{ fontSize: '14px', fontWeight: '500' }}>
-      {label} {!hideText && <span style={{ color: checked ? '#3b82f6' : 'var(--muted, #64748b)', marginLeft: '4px' }}>({checked ? onText : offText})</span>}
+      {label}
+      {!hideText && (
+        <span style={{ color: checked ? '#3b82f6' : 'var(--muted,#64748b)', marginLeft: '4px' }}>
+          ({checked ? onText : offText})
+        </span>
+      )}
     </span>
   </div>
 );
 
+/**
+ * Inline alert banner — replaces browser alert() calls.
+ * variant: 'error' | 'success' | 'warning' | 'info'
+ */
+function Banner({ variant = 'info', message, onDismiss }) {
+  if (!message) return null;
+  const palette = {
+    error:   { bg: '#fef2f2', border: '#fca5a5', color: '#b91c1c', icon: '✖' },
+    success: { bg: '#f0fdf4', border: '#86efac', color: '#15803d', icon: '✔' },
+    warning: { bg: '#fffbeb', border: '#fcd34d', color: '#b45309', icon: '⚠' },
+    info:    { bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8', icon: 'ℹ' },
+  };
+  const p = palette[variant] || palette.info;
+  return (
+    <div
+      role="alert"
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: '10px',
+        padding: '12px 14px', borderRadius: '8px', marginBottom: '14px',
+        background: p.bg, border: `1px solid ${p.border}`, color: p.color,
+        fontSize: '13px', fontWeight: '500', lineHeight: '1.5',
+      }}
+    >
+      <span style={{ fontSize: '16px', lineHeight: '1.4', flexShrink: 0 }}>{p.icon}</span>
+      <span style={{ flex: 1 }}>{message}</span>
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.color, fontSize: '16px', lineHeight: 1, padding: 0 }}
+          aria-label="Dismiss"
+        >×</button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Two-step progress indicator.
+ * step: 1 | 2
+ * step1Done: bool
+ * step2Done: bool
+ */
+function StepIndicator({ step, step1Done, step2Done }) {
+  const steps = [
+    { n: 1, label: 'Authenticate', done: step1Done },
+    { n: 2, label: 'Load Addresses', done: step2Done },
+  ];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '24px' }}>
+      {steps.map((st, idx) => {
+        const active = step === st.n;
+        const color  = st.done ? '#15803d' : active ? '#2563eb' : '#94a3b8';
+        const bg     = st.done ? '#dcfce7' : active ? '#dbeafe' : '#f1f5f9';
+        return (
+          <React.Fragment key={st.n}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '50%',
+                background: bg, border: `2px solid ${color}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: '700', color,
+              }}>
+                {st.done ? '✓' : st.n}
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: '600', color, whiteSpace: 'nowrap' }}>{st.label}</span>
+            </div>
+            {idx < steps.length - 1 && (
+              <div style={{ flex: 1, height: '2px', background: step1Done ? '#86efac' : '#e2e8f0', margin: '0 8px 18px' }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Parse legacy pickup_addresses_data JSON blob into dropdown options.
+ * Falls back gracefully; used only for pre-existing account edits.
+ */
+function parseLegacyPickupData(data) {
+  if (!data) return [];
+  let parsed = data;
+  if (typeof data === 'string') {
+    try { parsed = JSON.parse(data); } catch { return []; }
+  }
+  // New API shape: array of { value, label, city }
+  if (Array.isArray(parsed)) return parsed;
+  // Legacy shape: { detail: [...] }
+  if (parsed && Array.isArray(parsed.detail)) {
+    return parsed.detail.map(item => ({
+      value: item.costcentercode || item.code || '',
+      label: `${item.costcentercode || ''} — ${item.costcentername || ''}`,
+      city: item.costcentercity || '',
+    }));
+  }
+  return [];
+}
+
+function formatExpiry(expiry) {
+  if (!expiry) return null;
+  try {
+    const d = new Date(expiry);
+    return isNaN(d.getTime()) ? expiry : d.toLocaleString();
+  } catch { return expiry; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
 export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) {
-  // Top toggles
-  const [enabled, setEnabled] = useState(initialData?.is_enabled ?? false);
-  const [defaultAcc, setDefaultAcc] = useState(initialData?.is_default ?? false);
-  
-  // Account Info
-  const [username, setUsername] = useState(initialData?.username || '');
-  const [password, setPassword] = useState(''); // Don't prefill password for security, but allow blank if they don't want to change it
+  // ── Account info ────────────────────────────────────────────────────────────
+  const [username,      setUsername]      = useState(initialData?.username || '');
+  const [password,      setPassword]      = useState('');
   const [accountNumber, setAccountNumber] = useState(initialData?.account_number || '');
-  
-  // Form State
-  const [loading, setLoading] = useState(false);
-  const [isValidated, setIsValidated] = useState(!!initialData); // Pre-validated if editing
-  const [pickups, setPickups] = useState(initialData?.pickup_address ? [{ id: initialData.pickup_address, name: initialData.pickup_address + ' (Saved)' }] : []);
-  const [accessToken, setAccessToken] = useState(initialData?.access_token || '');
-  
-  // Settings
-  const [selectedPickup, setSelectedPickup] = useState(initialData?.pickup_address || '');
-  const [weight, setWeight] = useState(initialData?.default_weight || '0.5');
-  const [serviceType, setServiceType] = useState(initialData?.service_type || 'Express');
-  const [labelOption, setLabelOption] = useState(initialData?.label_print_option || 'Print Product Name Only');
-  const [insuranceOn, setInsuranceOn] = useState(initialData?.has_insurance ?? false);
-  const [fragile, setFragile] = useState(initialData?.is_fragile ?? false);
-  const [insuranceAmount, setInsuranceAmount] = useState(initialData?.default_insurance || '');
-  const [remarks, setRemarks] = useState(initialData?.shipper_remarks || '');
 
-  // Advanced Preferences
-  const [autoFulfillment, setAutoFulfillment] = useState(initialData?.auto_fulfillment ?? true);
+  // ── Step 1 state ─────────────────────────────────────────────────────────────
+  const [step1Done,    setStep1Done]    = useState(!!initialData);
+  const [accessToken,  setAccessToken]  = useState(initialData?.access_token || '');
+  const [tokenExpiry,  setTokenExpiry]  = useState('');
+  const [step1Banner,  setStep1Banner]  = useState(null); // { variant, message }
+
+  // ── Step 2 state ─────────────────────────────────────────────────────────────
+  const [step2Done,    setStep2Done]    = useState(!!initialData?.pickup_address);
+  const [costCenters,  setCostCenters]  = useState(() => {
+    if (initialData?.pickup_addresses_data) return parseLegacyPickupData(initialData.pickup_addresses_data);
+    return initialData?.pickup_address
+      ? [{ value: initialData.pickup_address, label: initialData.pickup_address + ' (Saved)', city: '' }]
+      : [];
+  });
+  const [step2Banner,  setStep2Banner]  = useState(null);
+
+  // ── Settings ─────────────────────────────────────────────────────────────────
+  const [selectedPickup,   setSelectedPickup]   = useState(initialData?.pickup_address || '');
+  const [weight,           setWeight]           = useState(initialData?.default_weight || '0.5');
+  const [serviceType,      setServiceType]      = useState(initialData?.service_type || 'Express');
+  const [labelOption,      setLabelOption]      = useState(initialData?.label_print_option || 'Print Product Name Only');
+  const [insuranceOn,      setInsuranceOn]      = useState(initialData?.has_insurance ?? false);
+  const [fragile,          setFragile]          = useState(initialData?.is_fragile ?? false);
+  const [insuranceAmount,  setInsuranceAmount]  = useState(initialData?.default_insurance || '');
+  const [remarks,          setRemarks]          = useState(initialData?.shipper_remarks || '');
+  const [enabled,          setEnabled]          = useState(initialData?.is_enabled ?? false);
+  const [defaultAcc,       setDefaultAcc]       = useState(initialData?.is_default ?? false);
+  const [autoFulfillment,  setAutoFulfillment]  = useState(initialData?.auto_fulfillment ?? true);
   const [autoSaveTracking, setAutoSaveTracking] = useState(initialData?.auto_save_tracking ?? false);
-  const [markPaidZero, setMarkPaidZero] = useState(initialData?.mark_paid_zero ?? true);
-  const [autoCalcWeight, setAutoCalcWeight] = useState(initialData?.auto_calc_weight ?? false);
-  const [autoCalcPieces, setAutoCalcPieces] = useState(initialData?.auto_calc_pieces ?? false);
-  const [addOrderNotes, setAddOrderNotes] = useState(initialData?.add_order_notes ?? false);
+  const [markPaidZero,     setMarkPaidZero]     = useState(initialData?.mark_paid_zero ?? true);
+  const [autoCalcWeight,   setAutoCalcWeight]   = useState(initialData?.auto_calc_weight ?? false);
+  const [autoCalcPieces,   setAutoCalcPieces]   = useState(initialData?.auto_calc_pieces ?? false);
+  const [addOrderNotes,    setAddOrderNotes]    = useState(initialData?.add_order_notes ?? false);
 
-  const validate = async () => {
-    if (!username || !password || !accountNumber) {
-      alert("Please enter Username, Password, and Account Number to validate.");
+  // Shared loading flag
+  const [loading, setLoading] = useState(false);
+
+  // Current active step for the progress indicator
+  const activeStep = step1Done ? 2 : 1;
+
+  // ── Step 1: Validate credentials ─────────────────────────────────────────────
+  const handleValidate = async () => {
+    if (!username || !password) {
+      setStep1Banner({ variant: 'error', message: 'Please enter both Username and Password.' });
       return;
     }
+    setStep1Banner(null);
+    setStep2Banner(null);
     setLoading(true);
+
     try {
-      const resp = await fetch('/api/tcs/validate', {
+      const resp = await fetch('/api/tcs/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, accountNumber })
+        body: JSON.stringify({ username, password, shop }),
       });
       const data = await resp.json();
-      if (data.success) {
-        if (data.data.accessToken) {
-          setAccessToken(data.data.accessToken);
-        }
-        setIsValidated(true);
-        alert('Validation Successful! You can now save your settings.');
+
+      if (!data.success) {
+        setStep1Banner({ variant: 'error', message: data.error || 'Authentication failed.' });
+        setStep1Done(false);
       } else {
-        alert('Validation failed: ' + data.error);
-        setIsValidated(false);
+        const receivedToken = data.accesstoken;
+        setAccessToken(receivedToken);
+        setTokenExpiry(formatExpiry(data.expiry));
+        setStep1Done(true);
+        setStep1Banner({
+          variant: 'success',
+          message: `✓ Authenticated successfully.${data.expiry ? '  Token valid until: ' + formatExpiry(data.expiry) : ''}`,
+        });
+
+        // ── Automatically trigger Step 2 if account number is present ──────
+        if (accountNumber) {
+          await loadPickups(receivedToken);
+        }
       }
-    } catch (e) {
-      console.error(e);
-      alert('Error validating credentials. Ensure the server is running.');
+    } catch {
+      setStep1Banner({ variant: 'error', message: 'Could not reach the server. Please ensure the app is running and try again.' });
+      setStep1Done(false);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const saveAccount = async () => {
+  // ── Step 2: Load pickup addresses ─────────────────────────────────────────────
+  const loadPickups = async (token = accessToken) => {
+    if (!accountNumber) {
+      setStep2Banner({ variant: 'error', message: 'Please enter an Account Number before loading pickup addresses.' });
+      return;
+    }
+    if (!token) {
+      setStep2Banner({ variant: 'error', message: 'No access token available. Please complete Step 1 (Validate Credentials) first.' });
+      return;
+    }
+    setStep2Banner(null);
+    setLoading(true);
+
+    try {
+      const resp = await fetch('/api/tcs/pickups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, accountNumber, accessToken: token, shop }),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        // Use the new costCenters array (deduped, formatted)
+        const options = data.costCenters || [];
+        setCostCenters(options);
+        setStep2Done(true);
+
+        if (options.length > 0 && !selectedPickup) {
+          setSelectedPickup(options[0].value);
+        }
+        setStep2Banner({
+          variant: 'success',
+          message: `${options.length} pickup address${options.length !== 1 ? 'es' : ''} loaded.`,
+        });
+      } else {
+        // Differentiate error types with specific guidance
+        let guidance = data.error || 'Failed to load pickup addresses.';
+        if (data.code === 'TOKEN_EXPIRED') {
+          guidance = 'Your access token has expired. Please click "Validate Credentials" again to get a fresh token.';
+          setStep1Done(false);
+          setAccessToken('');
+        } else if (data.code === 'ACCOUNT_NOT_FOUND') {
+          guidance = 'Account number not found. Double-check your TCS account number and try again.';
+        } else if (data.code === 'EMPTY_RESPONSE') {
+          guidance = 'TCS returned no pickup addresses for this account. Please contact TCS support or verify your account status.';
+        } else if (data.code === 'NETWORK_ERROR') {
+          guidance = 'Could not reach TCS servers. Please check your internet connection and try again.';
+        }
+        setStep2Banner({ variant: 'error', message: guidance });
+        setStep2Done(false);
+      }
+    } catch {
+      setStep2Banner({ variant: 'error', message: 'Network error loading pickup addresses. Please try again.' });
+      setStep2Done(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Re-load pickups (editing flow)
+  const handleReloadPickups = () => loadPickups(accessToken);
+
+  // ── Save account ──────────────────────────────────────────────────────────────
+  const handleSave = async () => {
     if (!initialData && (!username || !password || !accountNumber)) {
-      alert("Please provide Username, Password, and Account Number.");
+      setStep1Banner({ variant: 'error', message: 'Username, Password, and Account Number are required.' });
       return;
     }
     if (insuranceOn && !insuranceAmount) {
-      alert("Please provide the Default Insurance value since Insurance is enabled.");
+      setStep1Banner({ variant: 'warning', message: 'Please enter a Default Insurance Amount since Insurance is enabled.' });
       return;
     }
-    
     setLoading(true);
+
     const payload = {
       id: initialData?.id,
       shop,
@@ -207,121 +409,239 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
       auto_calc_weight: autoCalcWeight,
       auto_calc_pieces: autoCalcPieces,
       add_order_notes: addOrderNotes,
-      accessToken: accessToken
+      accessToken,
+      pickupAddressesData: costCenters.length > 0 ? JSON.stringify({ detail: costCenters }) : null,
     };
 
     try {
       const resp = await fetch('/api/tcs/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       const data = await resp.json();
       if (data.success) {
-        alert('Settings saved successfully!');
         if (onSave) onSave();
       } else {
-        alert('Failed to save settings: ' + data.error);
+        setStep1Banner({ variant: 'error', message: 'Failed to save settings: ' + data.error });
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error saving settings.");
+    } catch {
+      setStep1Banner({ variant: 'error', message: 'Error saving settings. Please try again.' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const deleteAccount = async () => {
-    if (!confirm("Are you sure you want to delete this account?")) return;
+  // ── Delete account ────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this account? This action cannot be undone.')) return;
     setLoading(true);
     try {
-      const resp = await fetch(`/api/tcs/accounts/${initialData.id}`, { method: 'DELETE' });
+      const resp = await fetch(`/api/tcs/accounts/${initialData.id}?shop=${encodeURIComponent(shop)}`, { method: 'DELETE' });
       const data = await resp.json();
       if (data.success) {
-        alert('Account deleted successfully!');
         if (onSave) onSave();
       } else {
-        alert('Error: ' + data.error);
+        setStep1Banner({ variant: 'error', message: 'Error: ' + data.error });
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error deleting account.");
+    } catch {
+      setStep1Banner({ variant: 'error', message: 'Error deleting account.' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────────
+  const settingsLocked = !step1Done;
+
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>
-        <span style={{ fontSize: '28px' }}>📦</span> TCS Courier Settings
+    <div style={s.container}>
+      {/* ── Header ── */}
+      <h2 style={s.title}>
+        <span style={{ fontSize: '26px' }}>📦</span> TCS Courier Settings
       </h2>
-      
-      {/* Top Toggles */}
-      <div style={{ ...styles.section, display: 'flex', gap: '30px' }}>
+
+      {/* ── Progress indicator ── */}
+      <StepIndicator step={activeStep} step1Done={step1Done} step2Done={step2Done} />
+
+      {/* ── Top toggles ── */}
+      <div style={{ ...s.section, display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
         <Toggle label="Enable Account" checked={enabled} onChange={setEnabled} onText="Enabled" offText="Disabled" />
         <Toggle label="Default Account" checked={defaultAcc} onChange={setDefaultAcc} onText="Default" offText="No" />
       </div>
 
-      {/* Credentials Section */}
-      <div style={styles.section}>
-        <h4 style={{ marginBottom: '16px', color: '#3b82f6' }}>Account Credentials</h4>
-        <div style={styles.row}>
-          <div style={styles.col}>
-            <label style={styles.label}>TCS Username *</label>
-            <input style={styles.input} type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. testenvio" />
+      {/* ══ STEP 1: Credentials ═══════════════════════════════════════════════ */}
+      <div style={s.section}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <p style={s.sectionHeading}>Step 1 — Account Credentials</p>
+          {step1Done && (
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: '20px' }}>
+              ✓ Authenticated
+            </span>
+          )}
+        </div>
+
+        {/* Banners */}
+        <Banner variant={step1Banner?.variant} message={step1Banner?.message} onDismiss={() => setStep1Banner(null)} />
+
+        <div style={s.row}>
+          <div style={s.col}>
+            <label style={s.label}>TCS Username *</label>
+            <input
+              id="tcs-username"
+              style={s.input}
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="e.g. testenvio"
+              autoComplete="username"
+            />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-            <div>
-              <label style={styles.label}>TCS Password {initialData ? "(Leave blank to keep existing)" : "*"}</label>
-              <input style={styles.input} type="password" value={password} onChange={e=>setPassword(e.target.value)} />
-            </div>
+          <div style={s.col}>
+            <label style={s.label}>TCS Password {initialData ? '(Leave blank to keep existing)' : '*'}</label>
+            <input
+              id="tcs-password"
+              style={s.input}
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
           </div>
-          <div style={styles.col}>
-            <label style={styles.label}>TCS Account Number *</label>
-            <input style={styles.input} type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="e.g. 04011K1" />
+          <div style={s.col}>
+            <label style={s.label}>TCS Account Number *</label>
+            <input
+              id="tcs-account-number"
+              style={s.input}
+              type="text"
+              value={accountNumber}
+              onChange={e => setAccountNumber(e.target.value)}
+              placeholder="e.g. 04011K1"
+            />
           </div>
         </div>
-        <button style={{ ...styles.button, opacity: loading ? 0.7 : 1 }} disabled={loading} onClick={validate}>
-          {loading ? 'Validating...' : 'Validate Credentials'}
+
+        {tokenExpiry && (
+          <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+            🔑 Token valid until: <strong>{tokenExpiry}</strong>
+          </p>
+        )}
+
+        <button
+          id="tcs-validate-btn"
+          style={{ ...s.primaryBtn, opacity: loading ? 0.65 : 1 }}
+          disabled={loading}
+          onClick={handleValidate}
+        >
+          {loading && !step1Done ? '⏳ Validating…' : step1Done ? '🔄 Re-validate Credentials' : '🔐 Validate Credentials'}
         </button>
       </div>
 
-      {/* Shipment Settings (Enabled only after validation, or visible but empty) */}
-      <div style={{ ...styles.section, opacity: isValidated ? 1 : 0.6, pointerEvents: isValidated ? 'auto' : 'none' }}>
-        <h4 style={{ marginBottom: '16px', color: '#3b82f6' }}>Shipment Defaults</h4>
-        
-        <div style={styles.row}>
-          <div style={styles.col}>
-            <label style={styles.label}>Pickup Address / Cost Center Code *</label>
-            <input 
-              style={styles.input} 
-              type="text" 
-              value={selectedPickup} 
-              onChange={e => setSelectedPickup(e.target.value)} 
-              placeholder="e.g. LHR-01" 
-            />
-          </div>
-          <div style={styles.col}>
-            <label style={styles.label}>Default Weight (Kg) *</label>
-            <input style={styles.input} type="number" step="0.01" value={weight} onChange={e => setWeight(e.target.value)} />
-          </div>
+      {/* ══ STEP 2: Pickup Addresses ═════════════════════════════════════════ */}
+      <div style={{ ...s.section, opacity: settingsLocked ? 0.55 : 1, pointerEvents: settingsLocked ? 'none' : 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <p style={s.sectionHeading}>Step 2 — Pickup Address &amp; Cost Center</p>
+          {step2Done && (
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: '20px' }}>
+              ✓ Loaded
+            </span>
+          )}
         </div>
 
-        <div style={styles.row}>
-          <div style={styles.col}>
-            <label style={styles.label}>Service Type *</label>
-            <select style={styles.input} value={serviceType} onChange={e => setServiceType(e.target.value)}>
+        {settingsLocked && (
+          <Banner variant="info" message="Complete Step 1 (validate credentials) to enable address loading." />
+        )}
+
+        <Banner variant={step2Banner?.variant} message={step2Banner?.message} onDismiss={() => setStep2Banner(null)} />
+
+        <div style={s.row}>
+          <div style={s.col}>
+            <label htmlFor="tcs-pickup-select" style={s.label}>Pickup Address / Cost Center Code *</label>
+
+            {costCenters.length > 0 ? (
+              <select
+                id="tcs-pickup-select"
+                style={s.input}
+                value={selectedPickup}
+                onChange={e => setSelectedPickup(e.target.value)}
+              >
+                {costCenters.map((cc, idx) => (
+                  <option key={cc.value || idx} value={cc.value}>
+                    {cc.label}{cc.city ? ` (${cc.city})` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : step1Done ? (
+              <>
+                <input
+                  id="tcs-pickup-select"
+                  style={s.input}
+                  type="text"
+                  value={selectedPickup}
+                  onChange={e => setSelectedPickup(e.target.value)}
+                  placeholder="Enter Cost Center Code manually"
+                />
+                <p style={{ fontSize: '12px', color: '#b45309', marginTop: '4px' }}>
+                  ⚠️ No pickup addresses loaded yet. Click "Load Pickup Addresses" or enter a code manually.
+                </p>
+              </>
+            ) : (
+              <select id="tcs-pickup-select" style={{ ...s.input, color: '#94a3b8' }} disabled>
+                <option>Validate credentials first to load addresses…</option>
+              </select>
+            )}
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+              <button
+                id="tcs-load-pickups-btn"
+                style={{ ...s.ghostBtn(), opacity: loading || settingsLocked ? 0.55 : 1 }}
+                onClick={() => loadPickups()}
+                disabled={loading || settingsLocked}
+              >
+                {loading && step1Done ? '⏳ Loading…' : '📍 Load Pickup Addresses'}
+              </button>
+              {initialData && (
+                <button
+                  id="tcs-reload-pickups-btn"
+                  style={{ ...s.ghostBtn('#0891b2'), opacity: loading ? 0.55 : 1 }}
+                  onClick={handleReloadPickups}
+                  disabled={loading}
+                >
+                  🔄 Reload from TCS
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ Shipment Defaults ════════════════════════════════════════════════ */}
+      <div style={{ ...s.section, opacity: settingsLocked ? 0.55 : 1, pointerEvents: settingsLocked ? 'none' : 'auto' }}>
+        <p style={s.sectionHeading}>Shipment Defaults</p>
+
+        <div style={s.row}>
+          <div style={s.col}>
+            <label style={s.label}>Default Weight (kg) *</label>
+            <input id="tcs-weight" style={s.input} type="number" step="0.01" value={weight} onChange={e => setWeight(e.target.value)} />
+          </div>
+          <div style={s.col}>
+            <label style={s.label}>Service Type *</label>
+            <select id="tcs-service-type" style={s.input} value={serviceType} onChange={e => setServiceType(e.target.value)}>
               <option value="Express">Express</option>
               <option value="Economy Express">Economy Express</option>
               <option value="Same Day">Same Day</option>
               <option value="Overland">Overland</option>
             </select>
           </div>
-          <div style={styles.col}>
-            <label style={styles.label}>Label Print Option</label>
-            <select style={styles.input} value={labelOption} onChange={e => setLabelOption(e.target.value)}>
+          <div style={s.col}>
+            <label style={s.label}>Label Print Option</label>
+            <select id="tcs-label-option" style={s.input} value={labelOption} onChange={e => setLabelOption(e.target.value)}>
               <option>Print Product Name Only</option>
               <option>Print Product SKU Only</option>
-              <option>Print Product Name & SKU</option>
+              <option>Print Product Name &amp; SKU</option>
               <option>Print Product Name + Extra Options + SKU</option>
               <option>Hide Product Info</option>
               <option>Print Store Name Only</option>
@@ -329,70 +649,85 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
           </div>
         </div>
 
-        <div style={styles.row}>
-          <div style={styles.col}>
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', height: '100%' }}>
-              <Toggle label="Insurance" checked={insuranceOn} onChange={setInsuranceOn} onText="On" offText="Off" />
-              <Toggle label="Fragile" checked={fragile} onChange={setFragile} />
-            </div>
+        <div style={s.row}>
+          <div style={{ ...s.col, display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <Toggle label="Insurance" checked={insuranceOn} onChange={setInsuranceOn} onText="On" offText="Off" />
+            <Toggle label="Fragile" checked={fragile} onChange={setFragile} />
           </div>
-          <div style={styles.col}>
+          <div style={s.col}>
             {insuranceOn && (
               <>
-                <label style={styles.label}>Default Insurance Amount *</label>
-                <input style={styles.input} type="number" value={insuranceAmount} onChange={e => setInsuranceAmount(e.target.value)} placeholder="e.g. 10" />
+                <label style={s.label}>Default Insurance Amount *</label>
+                <input
+                  id="tcs-insurance-amount"
+                  style={s.input}
+                  type="number"
+                  value={insuranceAmount}
+                  onChange={e => setInsuranceAmount(e.target.value)}
+                  placeholder="e.g. 10"
+                />
               </>
             )}
           </div>
         </div>
 
-        <div style={styles.row}>
-          <div style={{ flex: 1 }}>
-            <label style={styles.label}>Shipper Remarks (Optional)</label>
-            <input style={styles.input} type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="e.g. Please call customer before delivery" />
-          </div>
+        <div>
+          <label style={s.label}>Shipper Remarks (Optional)</label>
+          <input
+            id="tcs-remarks"
+            style={s.input}
+            type="text"
+            value={remarks}
+            onChange={e => setRemarks(e.target.value)}
+            placeholder="e.g. Please call customer before delivery"
+          />
         </div>
       </div>
 
-      {/* Advanced Settings */}
-      <div style={{ ...styles.section, opacity: isValidated ? 1 : 0.6, pointerEvents: isValidated ? 'auto' : 'none' }}>
-        <h4 style={{ marginBottom: '16px', color: '#3b82f6' }}>Advanced Preferences</h4>
-        <div style={styles.grid2Col}>
-          <Toggle label="Auto Order Fulfillment" checked={autoFulfillment} onChange={setAutoFulfillment} hideText />
-          <Toggle label="Auto Calculate Weight" checked={autoCalcWeight} onChange={setAutoCalcWeight} hideText />
-          
+      {/* ══ Advanced Preferences ═════════════════════════════════════════════ */}
+      <div style={{ ...s.section, opacity: settingsLocked ? 0.55 : 1, pointerEvents: settingsLocked ? 'none' : 'auto' }}>
+        <p style={s.sectionHeading}>Advanced Preferences</p>
+        <div style={s.grid2}>
+          <Toggle label="Auto Order Fulfillment"    checked={autoFulfillment}  onChange={setAutoFulfillment}  hideText />
+          <Toggle label="Auto Calculate Weight"     checked={autoCalcWeight}   onChange={setAutoCalcWeight}   hideText />
           <Toggle label="Auto Save Tracking Details" checked={autoSaveTracking} onChange={setAutoSaveTracking} hideText />
-          <Toggle label="Auto Calculate Pieces" checked={autoCalcPieces} onChange={setAutoCalcPieces} hideText />
-          
-          <Toggle label="Mark Paid Order as Zero" checked={markPaidZero} onChange={setMarkPaidZero} hideText />
-          <Toggle label="Add Order Notes in Remarks" checked={addOrderNotes} onChange={setAddOrderNotes} hideText />
+          <Toggle label="Auto Calculate Pieces"     checked={autoCalcPieces}   onChange={setAutoCalcPieces}   hideText />
+          <Toggle label="Mark Paid Order as Zero"   checked={markPaidZero}     onChange={setMarkPaidZero}     hideText />
+          <Toggle label="Add Order Notes in Remarks" checked={addOrderNotes}   onChange={setAddOrderNotes}    hideText />
         </div>
       </div>
 
-      {/* Save / Cancel Buttons */}
-      <div style={{ textAlign: 'right', marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+      {/* ══ Action buttons ═══════════════════════════════════════════════════ */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px', flexWrap: 'wrap' }}>
         {initialData && (
-          <button 
-            style={{ ...styles.button, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', marginRight: 'auto' }} 
-            onClick={deleteAccount}
+          <button
+            id="tcs-delete-btn"
+            style={{ ...s.ghostBtn('#ef4444'), marginRight: 'auto' }}
+            onClick={handleDelete}
             disabled={loading}
           >
             Delete Account
           </button>
         )}
         {onCancel && (
-          <button 
-            style={{ ...styles.button, background: 'var(--surface2, #f1f5f9)', color: 'var(--text, #0f172a)', border: '1px solid var(--border)' }} 
+          <button
+            id="tcs-cancel-btn"
+            style={{ ...s.ghostBtn('#64748b') }}
             onClick={onCancel}
+            disabled={loading}
           >
             Cancel
           </button>
         )}
-        <button style={{ ...styles.button, padding: '14px 32px', fontSize: '16px' }} onClick={saveAccount} disabled={loading}>
-          {loading ? 'Saving...' : (initialData ? 'Update Settings' : 'Save Settings')}
+        <button
+          id="tcs-save-btn"
+          style={{ ...s.primaryBtn, padding: '12px 30px', fontSize: '15px', opacity: loading ? 0.65 : 1 }}
+          onClick={handleSave}
+          disabled={loading}
+        >
+          {loading ? '⏳ Saving…' : initialData ? 'Update Settings' : 'Save Settings'}
         </button>
       </div>
-
     </div>
   );
 }

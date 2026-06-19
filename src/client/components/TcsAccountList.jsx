@@ -14,12 +14,41 @@ export default function TcsAccountList({ shop }) {
       const resp = await fetch(`/api/tcs/accounts?shop=${shop}`);
       const data = await resp.json();
       if (data.success) {
-        setAccounts(data.accounts);
+        // Deduplicate accounts by username and account number
+        const uniqueAccounts = [];
+        const seen = new Set();
+        for (const acc of data.accounts) {
+          const key = `${acc.username}-${acc.account_number}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueAccounts.push(acc);
+          } else {
+            // Auto-clean the duplicate from DB in the background
+            fetch(`/api/tcs/accounts/${acc.id}?shop=${shop}`, { method: 'DELETE' }).catch(console.error);
+          }
+        }
+        setAccounts(uniqueAccounts);
       }
     } catch (e) {
       console.error('Error fetching accounts', e);
     }
     setLoading(false);
+  };
+
+  const deleteAccount = async (id) => {
+    if (!confirm("Are you sure you want to delete this account?")) return;
+    try {
+      const resp = await fetch(`/api/tcs/accounts/${id}?shop=${shop}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (data.success) {
+        fetchAccounts();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error deleting account');
+    }
   };
 
   useEffect(() => {
@@ -134,6 +163,13 @@ export default function TcsAccountList({ shop }) {
                   style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border)', color: 'var(--text)', background: 'transparent', cursor: 'pointer', fontWeight: '600' }}
                 >
                   Edit
+                </button>
+                
+                <button 
+                  onClick={() => deleteAccount(acc.id)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ef4444', color: '#ef4444', background: 'transparent', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  Delete
                 </button>
               </div>
             </div>
