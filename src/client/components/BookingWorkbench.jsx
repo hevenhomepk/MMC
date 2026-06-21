@@ -158,13 +158,22 @@ export default function BookingWorkbench({ shop }) {
     const fetchData = async () => {
       setLoading(true);
       try {
+        const timestamp = Date.now();
         const [ordersResp, tcsAccsResp, postexAccsResp] = await Promise.all([
-          fetch(`/api/shopify/orders?shop=${shop}`),
-          fetch(`/api/tcs/accounts?shop=${shop}`),
-          fetch(`/api/postex/accounts?shop=${shop}`)
+          fetch(`/api/shopify/orders?shop=${shop}&t=${timestamp}`),
+          fetch(`/api/tcs/accounts?shop=${shop}&t=${timestamp}`),
+          fetch(`/api/postex/accounts?shop=${shop}&t=${timestamp}`)
         ]);
         
         const ordersData = await ordersResp.json();
+
+        // ── Check if OAuth is required ─────────────────────────────────────────
+        if (ordersData.requireAuth) {
+          // Redirect the TOP-LEVEL window out of the iframe to the Shopify install screen
+          window.top.location.href = `/api/shopify/auth?shop=${shop}`;
+          return; // Stop execution while it redirects
+        }
+
         const tcsData = await tcsAccsResp.json();
         const postexData = await postexAccsResp.json();
         

@@ -23,15 +23,12 @@ async function getUnfulfilledOrders(shop) {
       return [];
     }
 
-    // ── 1. Obtain the Custom App Access Token from .env ──────────────────────
-    const accessToken = process.env.SHOPIFY_CUSTOM_APP_TOKEN;
+    // ── 1. Obtain the Access Code from .env ──────────────────────────────────
+    const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
     if (!accessToken) {
-      console.error(
-        `[shopifyService] No SHOPIFY_CUSTOM_APP_TOKEN found in .env! ` +
-        'Please generate a Custom App token in Shopify Admin and add it to your .env file.'
-      );
-      return [];
+      console.log('[shopifyService] No SHOPIFY_ADMIN_ACCESS_TOKEN found. Prompting OAuth.');
+      return { requireAuth: true };
     }
 
     // ── 2. Call the Shopify Orders REST API ───────────────────────────────────
@@ -121,6 +118,10 @@ async function getUnfulfilledOrders(shop) {
         error.response.status,
         JSON.stringify(error.response.data)
       );
+      if (error.response.status === 401) {
+        console.log('[shopifyService] Token invalid (401). Prompting OAuth.');
+        return { requireAuth: true };
+      }
     }
     return [];
   }

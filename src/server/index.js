@@ -62,3 +62,4 @@ const shutdown = (signal) => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGUSR2', () => shutdown('SIGUSR2'));
