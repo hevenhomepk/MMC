@@ -165,19 +165,32 @@ export default function BookingWorkbench({ shop }) {
           fetch(`/api/postex/accounts?shop=${shop}&t=${timestamp}`)
         ]);
         
-        const ordersData = await ordersResp.json();
+        if (ordersResp.ok) {
+          const ordersData = await ordersResp.json();
 
-        // ── Check if OAuth is required ─────────────────────────────────────────
-        if (ordersData.requireAuth) {
-          // Redirect the TOP-LEVEL window out of the iframe to the Shopify install screen
-          window.top.location.href = `/api/shopify/auth?shop=${shop}`;
-          return; // Stop execution while it redirects
+          // ── Check if OAuth is required ─────────────────────────────────────────
+          if (ordersData.requireAuth) {
+            // Redirect the TOP-LEVEL window out of the iframe to the Shopify install screen
+            window.top.location.href = `/api/shopify/auth?shop=${shop}`;
+            return; // Stop execution while it redirects
+          }
+
+          if (ordersData.success) {
+            setOrders(ordersData.orders);
+          } else {
+            setErrors(prev => [...prev, ordersData.error || 'Failed to fetch orders from Shopify']);
+          }
+        } else {
+          try {
+            const errData = await ordersResp.json();
+            setErrors(prev => [...prev, errData.error || 'Failed to fetch orders (HTTP error)']);
+          } catch (_) {
+            setErrors(prev => [...prev, 'Failed to fetch orders (HTTP error)']);
+          }
         }
 
         const tcsData = await tcsAccsResp.json();
         const postexData = await postexAccsResp.json();
-        
-        if (ordersData.success) setOrders(ordersData.orders);
         
         let allAccs = [];
         if (tcsData.success) allAccs = [...allAccs, ...tcsData.accounts.filter(a=>a.is_enabled).map(a=>({...a, courier: 'tcs'}))];
@@ -190,7 +203,10 @@ export default function BookingWorkbench({ shop }) {
           setSelectedCourier(defAcc.courier);
           setSelectedAccount(defAcc.id);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error(e); 
+        setErrors(prev => [...prev, e.message || 'An unexpected error occurred while loading data']);
+      }
       setLoading(false);
     };
     fetchData();

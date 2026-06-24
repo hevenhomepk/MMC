@@ -122,8 +122,10 @@ async function getUnfulfilledOrders(shop) {
         console.log('[shopifyService] Token invalid (401). Prompting OAuth.');
         return { requireAuth: true };
       }
+      // Return the error message from Shopify API
+      throw new Error(`Shopify API Error (${error.response.status}): ${JSON.stringify(error.response.data.errors || error.response.data)}`);
     }
-    return [];
+    throw error;
   }
 }
 

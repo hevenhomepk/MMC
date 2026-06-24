@@ -15,6 +15,7 @@ router.get('/orders', async (req, res) => {
     }
     res.json({ success: true, orders: result });
   } catch (error) {
+    console.error('[shopifyRoute] Error handling orders request:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
