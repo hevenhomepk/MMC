@@ -37,7 +37,7 @@ async function getUnfulfilledOrders(shop) {
       {
         params: {
           fulfillment_status: 'unfulfilled',
-          status:             'open',
+          status:             'any',   // 'any' includes payment_pending orders from Draft Orders channel
           limit:              250,
         },
         headers: {
