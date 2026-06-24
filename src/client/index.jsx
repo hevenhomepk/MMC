@@ -20,7 +20,15 @@ import ShipperSettings from './components/ShipperSettings';
 
 function App() {
   const [route, setRoute] = useState(window.location.hash || '#dashboard');
-  const shop = new URLSearchParams(window.location.search).get('shop') || 'test-store.myshopify.com';
+  const [shop, setShop] = useState(() => {
+    const urlShop = new URLSearchParams(window.location.search).get('shop');
+    if (urlShop) {
+      localStorage.setItem('shopify_shop', urlShop);
+      return urlShop;
+    }
+    const savedShop = localStorage.getItem('shopify_shop');
+    return savedShop && savedShop !== 'test-store.myshopify.com' ? savedShop : '';
+  });
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -72,6 +80,41 @@ function App() {
       window.scrollTo(0, 0);
     }
   }, [route, isSettings, isPostEx, isBookings, isCourierManager, isHistoryTcs, isHistoryPostex, isLogs, isLoadsheetScanner, isLoadsheetLogs, isReturnAdd, isReturnSheets, isReturnPending, isReturnReceived, isAnalyticsPerformance, isAnalyticsReport, isAnalyticsCalendar, isShipperSettings]);
+
+  if (!shop) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ background: 'var(--surface, #fff)', border: '1px solid var(--border, #e2e8f0)', padding: '32px', borderRadius: '16px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '800', color: 'var(--text, #0f172a)' }}>🔌 Connect Shopify Store</h3>
+          <p style={{ fontSize: '13px', color: 'var(--muted, #64748b)', margin: '0 0 24px 0' }}>Enter your Shopify store domain to load and sync orders.</p>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const inputShop = e.target.elements.shopDomain.value.trim();
+            if (inputShop) {
+              const formattedShop = inputShop.includes('.') ? inputShop : `${inputShop}.myshopify.com`;
+              localStorage.setItem('shopify_shop', formattedShop);
+              setShop(formattedShop);
+              window.location.search = `?shop=${formattedShop}`;
+            }
+          }}>
+            <input 
+              name="shopDomain"
+              type="text" 
+              placeholder="store-name.myshopify.com" 
+              required
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '8px', border: '1px solid var(--border, #e2e8f0)', fontSize: '14px', outline: 'none', marginBottom: '16px', boxSizing: 'border-box', background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)' }}
+            />
+            <button 
+              type="submit"
+              style={{ width: '100%', height: '44px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.2)' }}
+            >
+              Connect Store
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (!isSettings && !isPostEx && !isBookings && !isCourierManager && !isHistoryTcs && !isHistoryPostex && !isLogs && !isLoadsheetScanner && !isLoadsheetLogs && !isReturnAdd && !isReturnSheets && !isReturnPending && !isReturnReceived && !isAnalyticsPerformance && !isAnalyticsReport && !isAnalyticsCalendar && !isShipperSettings) {
     return null;

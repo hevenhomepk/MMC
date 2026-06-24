@@ -1,16 +1,16 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "e36908ab553164173b0523f5dfdf69a2"
+client_id = "cfa6c39633523cec5c697869c2bb3d6f"
 name = "MMC"
-application_url = "https://shopify.dev/apps/default-app-home"
+application_url = "https://technician-editions-truck-hey.trycloudflare.com"
 embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "read_custom_fulfillment_services,write_custom_fulfillment_services,read_customers,write_customers,read_fulfillments,write_fulfillments,read_orders,write_orders"
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [ "https://technician-editions-truck-hey.trycloudflare.com/api/shopify/auth/callback" ]
 
 [webhooks]
 api_version = "2026-07"
