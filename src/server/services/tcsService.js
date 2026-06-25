@@ -402,10 +402,13 @@ async function callCostCenterInquiry(accessToken, accountNumber, baseUrl, gatewa
 
   for (const env of environments) {
     try {
+      const isProd = env.baseUrl.includes('ociconnect.tcscourier.com');
+      const authHeader = isProd ? `Bearer ${accessToken}` : `Bearer ${env.gatewayToken || getGatewayToken()}`;
+
       const res = await axios.get(`${env.baseUrl}/inquiry/costcenterinquiry`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': authHeader,
         },
         params: { accesstoken: accessToken, customerno: accountNumber },
         timeout: 8000,
@@ -766,11 +769,6 @@ async function bookShipment(payload) {
 
     console.log('[TCS Booking] Payload to TCS:', JSON.stringify(tcsPayload, null, 2));
 
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-
     // Try all env URLs if no baseUrl was resolved from the token
     const envUrls = baseUrl
       ? [baseUrl]
@@ -780,6 +778,14 @@ async function bookShipment(payload) {
     let lastErr = null;
     for (const url of envUrls) {
       try {
+        const isProd = url.includes('ociconnect.tcscourier.com');
+        const authHeader = isProd ? `Bearer ${token}` : `Bearer ${gatewayToken}`;
+
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader
+        };
+
         const response = await axios.post(`${url}/booking/create`, tcsPayload, { headers, timeout: 15000 });
         data = response.data;
         console.log('[TCS Booking] Response from', url, ':', JSON.stringify(data));
@@ -843,8 +849,11 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
   );
 
   try {
+    const isProd = baseUrl.includes('ociconnect.tcscourier.com');
+    const authHeader = isProd ? `Bearer ${token}` : `Bearer ${gatewayToken}`;
+
     const headers = {
-      'Authorization': `Bearer ${token}`
+      'Authorization': authHeader
     };
     const response = await axios.get(`${baseUrl}/report/loadsheetlogs`, {
       headers,
