@@ -444,15 +444,52 @@ async function fetchAndStorePickups({ username, password, accountNumber, accessT
   let baseUrl = null;
   let gatewayToken = getGatewayToken();
 
+  let dbPassword = password;
+  if (!dbPassword && username && shop) {
+    try {
+      const acctRes = await db.query(
+        'SELECT password FROM tcs_accounts WHERE username = $1 AND shop_domain = $2 LIMIT 1',
+        [username, shop]
+      );
+      if (acctRes.rows.length > 0) {
+        dbPassword = decrypt(acctRes.rows[0].password);
+      }
+    } catch (e) {
+      console.warn('[fetchAndStorePickups] Could not load password from DB:', e.message);
+    }
+  }
+
   if (!token) {
-    const authInfo = await getTcsToken(username, password, shop);
+    const authInfo = await getTcsToken(username, dbPassword || password, shop);
     token = authInfo.token;
     baseUrl = authInfo.baseUrl;
     gatewayToken = authInfo.gatewayToken;
   }
 
   // Call TCS API
-  const { detail, rawResponse } = await callCostCenterInquiry(token, accountNumber, baseUrl, gatewayToken);
+  let detail, rawResponse;
+  try {
+    const res = await callCostCenterInquiry(token, accountNumber, baseUrl, gatewayToken);
+    detail = res.detail;
+    rawResponse = res.rawResponse;
+  } catch (err) {
+    if (err.tcsCode === 'TOKEN_EXPIRED' && username && (dbPassword || password)) {
+      console.log(`[TCS Pickups] Token expired. Attempting to refresh token for ${username}...`);
+      try {
+        const authInfo = await getTcsToken(username, dbPassword || password, shop);
+        token = authInfo.token;
+        baseUrl = authInfo.baseUrl;
+        gatewayToken = authInfo.gatewayToken;
+        const res = await callCostCenterInquiry(token, accountNumber, baseUrl, gatewayToken);
+        detail = res.detail;
+        rawResponse = res.rawResponse;
+      } catch (retryErr) {
+        throw retryErr;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   if (!detail || detail.length === 0) {
     throw tcsError(
