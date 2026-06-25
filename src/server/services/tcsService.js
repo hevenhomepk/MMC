@@ -17,14 +17,25 @@ function encrypt(text) {
 }
 
 function decrypt(encryptedText) {
-  const textParts = encryptedText.split(':');
-  const iv = Buffer.from(textParts.shift(), 'hex');
-  const encrypted = textParts.join(':');
-  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default_key_32bytes_long!', 'salt', 32);
-  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  if (!encryptedText) return '';
+  if (!encryptedText.includes(':')) return encryptedText;
+  try {
+    const textParts = encryptedText.split(':');
+    const ivHex = textParts.shift();
+    const iv = Buffer.from(ivHex, 'hex');
+    if (iv.length !== 16) {
+      return encryptedText;
+    }
+    const encrypted = textParts.join(':');
+    const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default_key_32bytes_long!', 'salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    console.warn('[Decryption] Failed to decrypt text (returning as-is):', err.message);
+    return encryptedText;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
