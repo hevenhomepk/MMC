@@ -45,13 +45,27 @@ const SANDBOX_GATEWAY_TOKEN = process.env.TCS_SANDBOX_GATEWAY_TOKEN ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjpbIlRyYWNrIiwiRWNvbSIsIk5vdGlmaWNhdGlvbiJdLCJjbGllbnRpZCI6IjIxNTYxMDU1MiIsInNlcnZpY2VzIjoiMTAzLDE1NSwxNjEsMTY0LDIyNSwyNDcsMjQ4LDI0OSwyNTAsMjUxLDI3NywyOTMsNDQ4LDQ0OSw0NTAsNDUxLDQ1Miw0NTMsNDU0LDEwMTAiLCJleGNsdWRlZC1zZXJ2aWNlcyI6IiIsImlzcyI6InVhdC1taWRkbGV3YXJlLnRyYW56dW1way5jb20iLCJqdGkiOiI4MzMzNDRiNC0zNDQ0LTRhY2EtODhhNi1lN2VlNWQ3NGYzMzEiLCJuYmYiOjE3NTMwOTY3NTAsImV4cCI6MTgzOTQ5Njc1MCwiaWF0IjoxNzUzMDk2NzUwfQ.DIx4XCcda3QuVrp0HVaE7DB9Gz6eMn4d_jPUsFG16V0';
 const PROD_GATEWAY_TOKEN = process.env.TCS_PROD_GATEWAY_TOKEN || '';
 
+// devconnect = sandbox/UAT, ociconnect = production.
+// Sandbox is tried first because TCS_PROD_GATEWAY_TOKEN may not yet be set.
+// To enable production, add TCS_PROD_GATEWAY_TOKEN to your Render env vars.
 const TCS_ENVIRONMENTS = [
-  { baseUrl: 'https://ociconnect.tcscourier.com/ecom/api' },
   { baseUrl: 'https://devconnect.tcscourier.com/ecom/api' },
+  { baseUrl: 'https://ociconnect.tcscourier.com/ecom/api' },
 ];
 
-function getGatewayToken() {
-  return process.env.TCS_GATEWAY_TOKEN || SANDBOX_GATEWAY_TOKEN || PROD_GATEWAY_TOKEN;
+// Sandbox gateway token authenticates devconnect calls; prod token for ociconnect.
+// The accesstoken from /authentication/token goes in the JSON *body* — not the header.
+function getGatewayToken(baseUrl) {
+  const isProd = baseUrl && baseUrl.includes('ociconnect.tcscourier.com');
+  if (isProd) {
+    return process.env.TCS_PROD_GATEWAY_TOKEN || PROD_GATEWAY_TOKEN;
+  }
+  return process.env.TCS_SANDBOX_GATEWAY_TOKEN || SANDBOX_GATEWAY_TOKEN;
+}
+
+// Keep a no-arg version for backwards-compat (defaults to sandbox)
+function getDefaultGatewayToken() {
+  return process.env.TCS_GATEWAY_TOKEN || SANDBOX_GATEWAY_TOKEN;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -204,11 +218,12 @@ async function getTcsToken(username, password, shop = null) {
 
   for (const env of TCS_ENVIRONMENTS) {
     try {
+      const gwToken = getGatewayToken(env.baseUrl);
       const res = await axios.get(`${env.baseUrl}/authentication/token`, {
         params: { username, password },
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${gatewayToken}`,
+          'Authorization': `Bearer ${gwToken}`,
         },
         timeout: 8000,
       });
@@ -402,14 +417,14 @@ async function callCostCenterInquiry(accessToken, accountNumber, baseUrl, gatewa
 
   for (const env of environments) {
     try {
-      // Always use the access token (not the gateway token) for all post-auth API calls.
-      // The gateway token is only for the /authentication/token handshake.
-      const authHeader = `Bearer ${accessToken}`;
+      // TCS dual-auth: gateway token in Authorization header (authenticates the integration),
+      // access token goes in query param (authenticates the TCS user account).
+      const gwToken = getGatewayToken(env.baseUrl);
 
       const res = await axios.get(`${env.baseUrl}/inquiry/costcenterinquiry`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': authHeader,
+          'Authorization': `Bearer ${gwToken}`,
         },
         params: { accesstoken: accessToken, customerno: accountNumber },
         timeout: 8000,
@@ -816,11 +831,13 @@ async function bookShipment(payload) {
     let lastErr = null;
     for (const url of envUrls) {
       try {
-        // Always use the access token (not the gateway token) for booking calls.
-        // The gateway token is only for the /authentication/token handshake.
+        // TCS dual-auth: gateway token in Authorization header (authenticates the integration),
+        // access token goes in the JSON body field `accesstoken` (authenticates the TCS user).
+        const gwToken = getGatewayToken(url);
+
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${gwToken}`
         };
 
         const response = await axios.post(`${url}/booking/create`, tcsPayload, { headers, timeout: 15000 });
@@ -886,10 +903,10 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
   );
 
   try {
-    // Always use the access token (not the gateway token) for loadsheet calls.
-    // The gateway token is only for the /authentication/token handshake.
+    // TCS dual-auth: gateway token in Authorization header, access token in params.
+    const gwToken = getGatewayToken(baseUrl);
     const headers = {
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${gwToken}`
     };
     const response = await axios.get(`${baseUrl}/report/loadsheetlogs`, {
       headers,
