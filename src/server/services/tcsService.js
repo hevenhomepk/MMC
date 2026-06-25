@@ -526,7 +526,7 @@ async function saveAccount(data) {
   const {
     id, shop, username, password, accountNumber, is_enabled, is_default,
     pickup_address, default_weight, has_insurance, default_insurance,
-    shipper_remarks, service_type, is_fragile, label_print_option,
+    shipper_remarks, shipper_phone, service_type, is_fragile, label_print_option,
     auto_fulfillment, auto_save_tracking, mark_paid_zero, auto_calc_weight,
     auto_calc_pieces, add_order_notes, accessToken, pickupAddressesData,
   } = data;
@@ -541,7 +541,7 @@ async function saveAccount(data) {
     const values = [
       shop, username, encryptedPassword, accountNumber, is_enabled || false, is_default || false,
       pickup_address, default_weight || 0.5, has_insurance || false, default_insurance || null,
-      shipper_remarks || '', service_type || 'Express', is_fragile || false,
+      shipper_remarks || '', shipper_phone || '', service_type || 'Express', is_fragile || false,
       label_print_option || 'Print Product Name Only',
       auto_fulfillment !== undefined ? auto_fulfillment : true,
       auto_save_tracking !== undefined ? auto_save_tracking : false,
@@ -560,11 +560,11 @@ async function saveAccount(data) {
           username = $2, password = COALESCE($3, password), account_number = $4,
           is_enabled = $5, is_default = $6, pickup_address = $7, default_weight = $8,
           has_insurance = $9, default_insurance = $10, shipper_remarks = $11,
-          service_type = $12, is_fragile = $13, label_print_option = $14,
-          auto_fulfillment = $15, auto_save_tracking = $16, mark_paid_zero = $17,
-          auto_calc_weight = $18, auto_calc_pieces = $19, add_order_notes = $20,
-          access_token = $21, pickup_addresses_data = $22, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $23 AND shop_domain = $1
+          shipper_phone = $12, service_type = $13, is_fragile = $14, label_print_option = $15,
+          auto_fulfillment = $16, auto_save_tracking = $17, mark_paid_zero = $18,
+          auto_calc_weight = $19, auto_calc_pieces = $20, add_order_notes = $21,
+          access_token = $22, pickup_addresses_data = $23, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $24 AND shop_domain = $1
         RETURNING id`;
       result = await db.query(updateQuery, [...values, id]);
     } else {
@@ -572,11 +572,11 @@ async function saveAccount(data) {
         INSERT INTO tcs_accounts (
           shop_domain, username, password, account_number, is_enabled, is_default,
           pickup_address, default_weight, has_insurance, default_insurance,
-          shipper_remarks, service_type, is_fragile, label_print_option,
+          shipper_remarks, shipper_phone, service_type, is_fragile, label_print_option,
           auto_fulfillment, auto_save_tracking, mark_paid_zero, auto_calc_weight,
           auto_calc_pieces, add_order_notes, access_token, pickup_addresses_data
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
         ) RETURNING id`;
       result = await db.query(insertQuery, values);
     }
@@ -645,53 +645,169 @@ async function bookShipment(payload) {
     const authInfo = await getTcsToken(account.username, decrypt(account.password), shop);
     const { token, baseUrl, gatewayToken } = authInfo;
 
+    // ── Resolve shipper city from cost_centers table ───────────────────────────
+    let shipperCityName = 'Karachi';
+    let shipperAddress  = account.pickup_address || '';
+    try {
+      const ccRes = await db.query(
+        `SELECT costcentercity, pickup_address FROM cost_centers
+         WHERE account_number = $1 AND shop_domain = $2 AND costcentercode = $3
+         LIMIT 1`,
+        [account.account_number, shop, account.pickup_address]
+      );
+      if (ccRes.rows.length > 0) {
+        shipperCityName = ccRes.rows[0].costcentercity || shipperCityName;
+        shipperAddress  = ccRes.rows[0].pickup_address  || shipperAddress;
+      }
+    } catch (e) {
+      console.warn('[TCS Booking] Could not resolve cost center city (non-fatal):', e.message);
+    }
+
+    // ── Parse consignee name into first / last ─────────────────────────────────
+    const fullName  = (bookingDetails.consigneeName || '').trim();
+    const nameParts = fullName.split(/\s+/);
+    const firstName = nameParts[0] || fullName || 'Customer';
+    const lastName  = nameParts.slice(1).join(' ') || '';
+
+    // ── Map service type to TCS service code ───────────────────────────────────
+    // Account service_type: 'Express'→'O', 'Economy Express'→'E', 'Same Day'→'O', 'Overland'→'2'
+    // BookingWorkbench per-order: 'O', '2', 'E'
+    const serviceTypeRaw = bookingDetails.serviceType || account.service_type || 'Express';
+    const svcMap = {
+      'O': 'O', 'Express': 'O', 'Same Day': 'O',
+      '2': '2', 'Overland': '2', 'Second Day': '2',
+      'E': 'E', 'Economy Express': 'E', 'Economy': 'E',
+    };
+    const serviceCode = svcMap[serviceTypeRaw] || 'O';
+
+    // ── Sanitize phone (TCS requires exactly 11 digits: 0300xxxxxxx) ──────────
+    function sanitizePhone(phone) {
+      if (!phone) return '03000000000';
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('0'))  return digits;
+      if (digits.length === 10 && digits.startsWith('3'))  return '0' + digits;
+      if (digits.length === 12 && digits.startsWith('92')) return '0' + digits.slice(2);
+      return (digits + '00000000000').slice(0, 11);
+    }
+
+    // ── Build the official TCS booking payload ─────────────────────────────────
     const tcsPayload = {
-      accesstoken: token,
-      tcsaccount: account.account_number,
-      consignmentno: null,
-      shipmentDetails: {
-        shipperName: shop,
-        shipperPhone: '',
-        shipperAddress: account.pickup_address || 'Default Address',
-        consigneeName: bookingDetails.consigneeName,
-        consigneePhone: bookingDetails.consigneePhone,
-        consigneeAddress: bookingDetails.consigneeAddress || 'Not Provided',
-        destinationCity: bookingDetails.consigneeCity,
-        weight: parseFloat(account.default_weight) || 0.5,
-        pieces: parseInt(bookingDetails.pieces) || 1,
-        codAmount: parseFloat(bookingDetails.codAmount) || 0,
-        customerReferenceNo: orderId,
-        services: account.service_type || 'Express',
-        remarks: account.shipper_remarks || '',
-        insuranceValue: account.has_insurance ? (account.default_insurance || 0) : 0,
-        fragile: account.is_fragile ? 'Yes' : 'No',
+      accesstoken:   token,
+      consignmentno: '',
+      shipperinfo: {
+        tcsaccount:  account.account_number,
+        shippername: account.username || shop,
+        address1:    (shipperAddress || 'Default Address').slice(0, 120),
+        address2:    '',
+        address3:    '',
+        zip:         '',
+        countrycode: 'PK',
+        countryname: 'Pakistan',
+        citycode:    '',
+        cityname:    shipperCityName.slice(0, 50),
+        mobile:      sanitizePhone(account.shipper_phone || ''),
+      },
+      consigneeinfo: {
+        consigneecode: '',
+        firstname:     firstName.slice(0, 50),
+        middlename:    '',
+        lastname:      lastName.slice(0, 50),
+        address1:      (bookingDetails.consigneeAddress || 'Not Provided').slice(0, 120),
+        address2:      '',
+        address3:      '',
+        zip:           '',
+        countrycode:   'PK',
+        countryname:   'Pakistan',
+        citycode:      '',
+        cityname:      (bookingDetails.consigneeCity || 'Karachi').slice(0, 50),
+        email:         (bookingDetails.consigneeEmail || '').slice(0, 50),
+        areacode:      '',
+        areaname:      '',
+        blockcode:     '',
+        blockname:     '',
+        lat:           '',
+        lng:           '',
+        landmark:      '',
+        mobile:        sanitizePhone(bookingDetails.consigneePhone),
+      },
+      shipmentinfo: {
+        costcentercode:  account.pickup_address || '',
+        referenceno:     (orderId || '').slice(0, 50),
+        contentdesc:     (bookingDetails.productDesc || 'Goods').slice(0, 99),
+        servicecode:     serviceCode,
+        parametertype:   '',
+        shipmentdate:    '',
+        shippingtype:    '',
+        currency:        'PKR',
+        codamount:       parseInt(parseFloat(bookingDetails.codAmount) || 0),
+        declaredvalue:   null,
+        insuredvalue:    account.has_insurance ? parseInt(parseFloat(account.default_insurance) || 0) : null,
+        transactiontype: '',
+        dsflag:          '',
+        carrierslug:     '',
+        weightinkg:      Math.max(0.5, parseFloat(bookingDetails.weight) || parseFloat(account.default_weight) || 0.5),
+        pieces:          Math.max(1, parseInt(bookingDetails.pieces) || 1),
+        fragile:         account.is_fragile || false,
+        remarks:         (bookingDetails.remarks || account.shipper_remarks || '').slice(0, 499),
+        skus:            [],
       },
     };
+
+    console.log('[TCS Booking] Payload to TCS:', JSON.stringify(tcsPayload, null, 2));
 
     const headers = { 'Content-Type': 'application/json' };
     if (gatewayToken) headers['Authorization'] = `Bearer ${gatewayToken}`;
 
-    const response = await axios.post(`${baseUrl}/booking/create`, tcsPayload, { headers, timeout: 10000 });
-    const data = response.data;
-    if (!data || data.error) throw new Error(data?.message || data?.error || 'Failed to create booking on TCS.');
+    // Try all env URLs if no baseUrl was resolved from the token
+    const envUrls = baseUrl
+      ? [baseUrl]
+      : TCS_ENVIRONMENTS.map(e => e.baseUrl);
 
-    const trackingNumber = data.consignmentno || data.trackingNumber || data.cn;
-    if (!trackingNumber) throw new Error('TCS API responded with success but tracking number was missing.');
+    let data = null;
+    let lastErr = null;
+    for (const url of envUrls) {
+      try {
+        const response = await axios.post(`${url}/booking/create`, tcsPayload, { headers, timeout: 15000 });
+        data = response.data;
+        console.log('[TCS Booking] Response from', url, ':', JSON.stringify(data));
+        break;
+      } catch (e) {
+        lastErr = e;
+        console.warn(`[TCS Booking] Failed on ${url}:`, e.response?.data || e.message);
+      }
+    }
+
+    if (!data) {
+      const errMsg = lastErr?.response?.data?.message || lastErr?.message || 'Failed to create booking on TCS.';
+      throw new Error(errMsg);
+    }
+
+    // Per TCS spec, success response: { consignmentNo, message, traceid }
+    const consignmentNo = data.consignmentNo || data.consignmentno || data.trackingNumber || data.cn;
+    const traceid       = data.traceid || data.traceId || null;
+
+    if (!consignmentNo) {
+      const apiMsg = data.message || data.error || JSON.stringify(data);
+      throw new Error(`TCS did not return a consignment number. Response: ${apiMsg}`);
+    }
+
+    console.log(`[TCS Booking] Booked! CN: ${consignmentNo}, TraceID: ${traceid}`);
 
     await bookingService.saveBooking({
       shop,
-      orderId: bookingDetails.orderId,
-      courier: 'TCS',
-      trackingNumber,
-      consigneeName: bookingDetails.consigneeName,
+      orderId:        bookingDetails.orderId,
+      courier:        'TCS',
+      trackingNumber: consignmentNo,
+      traceid,
+      consigneeName:  bookingDetails.consigneeName,
       consigneePhone: bookingDetails.consigneePhone,
-      consigneeCity: bookingDetails.consigneeCity,
-      codAmount: parseFloat(bookingDetails.codAmount),
-      orderAmount: parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
+      consigneeCity:  bookingDetails.consigneeCity,
+      codAmount:      parseFloat(bookingDetails.codAmount),
+      orderAmount:    parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
       accountId,
     });
 
-    return { success: true, trackingNumber };
+    return { success: true, trackingNumber: consignmentNo, consignmentNo, traceid };
 
   } catch (error) {
     console.error('TCS Booking Error:', error.response?.data || error.message);

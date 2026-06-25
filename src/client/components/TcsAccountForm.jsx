@@ -254,6 +254,7 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
   const [fragile,          setFragile]          = useState(initialData?.is_fragile ?? false);
   const [insuranceAmount,  setInsuranceAmount]  = useState(initialData?.default_insurance || '');
   const [remarks,          setRemarks]          = useState(initialData?.shipper_remarks || '');
+  const [shipperPhone,     setShipperPhone]     = useState(initialData?.shipper_phone || '');
   const [enabled,          setEnabled]          = useState(initialData?.is_enabled ?? false);
   const [defaultAcc,       setDefaultAcc]       = useState(initialData?.is_default ?? false);
   const [autoFulfillment,  setAutoFulfillment]  = useState(initialData?.auto_fulfillment ?? true);
@@ -400,6 +401,7 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
       has_insurance: insuranceOn,
       default_insurance: insuranceOn ? parseFloat(insuranceAmount) : null,
       shipper_remarks: remarks,
+      shipper_phone: shipperPhone,
       service_type: serviceType,
       is_fragile: fragile,
       label_print_option: labelOption,
@@ -671,16 +673,29 @@ export default function TcsAccountForm({ shop, onCancel, onSave, initialData }) 
           </div>
         </div>
 
-        <div>
-          <label style={s.label}>Shipper Remarks (Optional)</label>
-          <input
-            id="tcs-remarks"
-            style={s.input}
-            type="text"
-            value={remarks}
-            onChange={e => setRemarks(e.target.value)}
-            placeholder="e.g. Please call customer before delivery"
-          />
+        <div style={s.row}>
+          <div style={s.col}>
+            <label style={s.label}>Shipper Phone (Required for TCS)</label>
+            <input
+              id="tcs-shipper-phone"
+              style={s.input}
+              type="text"
+              value={shipperPhone}
+              onChange={e => setShipperPhone(e.target.value)}
+              placeholder="e.g. 03001234567"
+            />
+          </div>
+          <div style={s.col}>
+            <label style={s.label}>Shipper Remarks (Optional)</label>
+            <input
+              id="tcs-remarks"
+              style={s.input}
+              type="text"
+              value={remarks}
+              onChange={e => setRemarks(e.target.value)}
+              placeholder="e.g. Please call customer before delivery"
+            />
+          </div>
         </div>
       </div>
 

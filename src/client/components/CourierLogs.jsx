@@ -156,9 +156,9 @@ export default function CourierLogs({ shop, courierFilter }) {
     { key: 'consignee_city', label: 'City' },
     { key: 'cod_amount', label: 'COD' },
     { key: 'courier', label: 'Courier' },
-    { key: 'tracking_number', label: 'Tracking' },
+    { key: 'tracking_number', label: 'Consignment No.' },
+    { key: 'traceid', label: 'Trace ID' },
     { key: 'status', label: 'Status' },
-    { key: 'result', label: 'Result' }
   ];
 
   return (
@@ -290,13 +290,19 @@ export default function CourierLogs({ shop, courierFilter }) {
                 <td style={styles.td}>{b.consignee_city}</td>
                 <td style={styles.td}>Rs. {b.cod_amount}</td>
                 <td style={styles.td}>{b.courier}</td>
-                <td style={{ ...styles.td, color: '#3b82f6', fontWeight: '700' }}>{b.tracking_number}</td>
+                <td style={{ ...styles.td }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: '800', fontSize: '14px', color: '#2563eb', letterSpacing: '0.5px' }}>
+                    {b.tracking_number}
+                  </span>
+                </td>
+                <td style={{ ...styles.td, fontSize: '11px', color: '#94a3b8' }}>
+                  {b.traceid ? b.traceid.slice(0, 8) + '…' : '-'}
+                </td>
                 <td style={styles.td}>
                   <span style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '800', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', textTransform: 'uppercase' }}>
                     {b.status}
                   </span>
                 </td>
-                <td style={styles.td}>-</td>
               </tr>
             ))}
             {filteredLogs.length === 0 && (

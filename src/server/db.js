@@ -47,8 +47,10 @@ const initDB = async () => {
     ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS access_token TEXT;
     ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS pickup_addresses_data TEXT;
     ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ;
+    ALTER TABLE tcs_accounts ADD COLUMN IF NOT EXISTS shipper_phone VARCHAR(20);
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS consignee_phone VARCHAR(50);
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS loadsheet_id INTEGER;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS traceid VARCHAR(255);
     ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS total_amount DECIMAL(15,2) DEFAULT 0;
     ALTER TABLE loadsheets ADD COLUMN IF NOT EXISTS total_cod DECIMAL(15,2) DEFAULT 0;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_amount DECIMAL(15,2) DEFAULT 0;

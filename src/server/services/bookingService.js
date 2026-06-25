@@ -15,21 +15,36 @@ async function getAllBookings(shop) {
 }
 
 async function saveBooking(data) {
-  const { shop, orderId, courier, trackingNumber, consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount, accountId } = data;
+  const { shop, orderId, courier, trackingNumber, traceid, consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount, accountId } = data;
   try {
     const query = `
       INSERT INTO bookings (
         shop_domain, order_id, courier, tracking_number, 
-        consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id, traceid
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
     const result = await db.query(query, [
       shop, orderId, courier, trackingNumber,
-      consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount || 0, accountId
+      consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount || 0, accountId, traceid || null
     ]);
     return result.rows[0];
   } catch (error) {
+    // If traceid column doesn't exist yet, fall back without it
+    if (error.message && error.message.includes('traceid')) {
+      const query = `
+        INSERT INTO bookings (
+          shop_domain, order_id, courier, tracking_number, 
+          consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `;
+      const result = await db.query(query, [
+        shop, orderId, courier, trackingNumber,
+        consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount || 0, accountId
+      ]);
+      return result.rows[0];
+    }
     console.error('Error saving booking:', error);
     throw error;
   }
