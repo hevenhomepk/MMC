@@ -394,7 +394,7 @@ async function callCostCenterInquiry(accessToken, accountNumber, baseUrl, gatewa
       const res = await axios.get(`${env.baseUrl}/inquiry/costcenterinquiry`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.gatewayToken || getGatewayToken()}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
         params: { accesstoken: accessToken, customerno: accountNumber },
         timeout: 8000,
@@ -755,8 +755,10 @@ async function bookShipment(payload) {
 
     console.log('[TCS Booking] Payload to TCS:', JSON.stringify(tcsPayload, null, 2));
 
-    const headers = { 'Content-Type': 'application/json' };
-    if (gatewayToken) headers['Authorization'] = `Bearer ${gatewayToken}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
 
     // Try all env URLs if no baseUrl was resolved from the token
     const envUrls = baseUrl
@@ -830,8 +832,9 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
   );
 
   try {
-    const headers = {};
-    if (gatewayToken) headers['Authorization'] = `Bearer ${gatewayToken}`;
+    const headers = {
+      'Authorization': `Bearer ${token}`
+    };
     const response = await axios.get(`${baseUrl}/report/loadsheetlogs`, {
       headers,
       params: { accesstoken: token, customerno: activeAccount.account_number, fromdate: fromDate, todate: toDate },
