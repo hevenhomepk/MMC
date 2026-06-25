@@ -402,8 +402,9 @@ async function callCostCenterInquiry(accessToken, accountNumber, baseUrl, gatewa
 
   for (const env of environments) {
     try {
-      const isProd = env.baseUrl.includes('ociconnect.tcscourier.com');
-      const authHeader = isProd ? `Bearer ${accessToken}` : `Bearer ${env.gatewayToken || getGatewayToken()}`;
+      // Always use the access token (not the gateway token) for all post-auth API calls.
+      // The gateway token is only for the /authentication/token handshake.
+      const authHeader = `Bearer ${accessToken}`;
 
       const res = await axios.get(`${env.baseUrl}/inquiry/costcenterinquiry`, {
         headers: {
@@ -815,12 +816,11 @@ async function bookShipment(payload) {
     let lastErr = null;
     for (const url of envUrls) {
       try {
-        const isProd = url.includes('ociconnect.tcscourier.com');
-        const authHeader = isProd ? `Bearer ${token}` : `Bearer ${gatewayToken}`;
-
+        // Always use the access token (not the gateway token) for booking calls.
+        // The gateway token is only for the /authentication/token handshake.
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': authHeader
+          'Authorization': `Bearer ${token}`
         };
 
         const response = await axios.post(`${url}/booking/create`, tcsPayload, { headers, timeout: 15000 });
@@ -886,11 +886,10 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
   );
 
   try {
-    const isProd = baseUrl.includes('ociconnect.tcscourier.com');
-    const authHeader = isProd ? `Bearer ${token}` : `Bearer ${gatewayToken}`;
-
+    // Always use the access token (not the gateway token) for loadsheet calls.
+    // The gateway token is only for the /authentication/token handshake.
     const headers = {
-      'Authorization': authHeader
+      'Authorization': `Bearer ${token}`
     };
     const response = await axios.get(`${baseUrl}/report/loadsheetlogs`, {
       headers,
