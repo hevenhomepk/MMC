@@ -194,6 +194,15 @@ const initDB = async () => {
     await pool.query(createTcsTokensTableQuery);
     await pool.query(createPickupAddressesTableQuery);
     await pool.query(createCostCentersTableQuery);
+    
+    // One-time database cleanup for user request: change order #1001 and #1002 to unfulfilled (unbooked)
+    await pool.query(`
+      DELETE FROM bookings 
+      WHERE order_id IN ('#1001', '#1002', '1001', '1002') 
+        AND shop_domain = 'luxessentials-qwfswl1g.myshopify.com'
+    `);
+    console.log('One-time database cleanup: order 1001 and 1002 changed to unfulfilled.');
+
     console.log('Database initialized: all tables ready.');
   } catch (err) {
     console.error('Error initializing database:', err.message);
@@ -205,4 +214,5 @@ initDB();
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
+  pool,
 };
