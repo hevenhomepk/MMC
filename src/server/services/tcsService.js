@@ -3,6 +3,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const db = require('../db');
 const bookingService = require('./bookingService');
+const shopifyService = require('./shopifyService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Encryption helpers (AES-256-CBC, key from env)
@@ -879,6 +880,14 @@ async function bookShipment(payload) {
       orderAmount:    parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
       accountId,
     });
+
+    if (account.auto_fulfillment) {
+      try {
+        await shopifyService.fulfillOrder(shop, bookingDetails.orderId, consignmentNo, 'TCS');
+      } catch (err) {
+        console.error('[TCS Booking] Failed to fulfill order on Shopify (non-fatal):', err.message);
+      }
+    }
 
     return { success: true, trackingNumber: consignmentNo, consignmentNo, traceid };
 

@@ -2,6 +2,7 @@
 const axios = require('axios');
 const db = require('../db');
 const bookingService = require('./bookingService');
+const shopifyService = require('./shopifyService');
 
 const POSTEX_BASE_URL = 'https://api.postex.pk';
 
@@ -186,6 +187,14 @@ async function bookShipment(payload) {
         orderAmount: parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
         accountId: accountId
       });
+
+      if (acc.auto_fulfillment) {
+        try {
+          await shopifyService.fulfillOrder(shop, bookingDetails.orderId, trackingNumber, 'PostEx');
+        } catch (err) {
+          console.error('[PostEx Booking] Failed to fulfill order on Shopify (non-fatal):', err.message);
+        }
+      }
 
       return { 
         success: true, 

@@ -128,5 +128,132 @@ async function getUnfulfilledOrders(shop) {
     throw error;
   }
 }
+/**
+ * Fulfills an order on Shopify by creating a fulfillment against its fulfillment orders.
+ *
+ * @param {string} shop         Shopify store domain, e.g. "luxessentials-qwfswl1g.myshopify.com"
+ * @param {string} orderName    Shopify order name, e.g. "#1002"
+ * @param {string} trackingNum  Courier tracking/consignment number
+ * @param {string} courierName  Courier company name (e.g. "TCS" or "PostEx")
+ * @returns {Promise<Object>}   The Shopify API response data
+ */
+async function fulfillOrder(shop, orderName, trackingNum, courierName) {
+  try {
+    if (!shop || !orderName || !trackingNum) {
+      console.error('[shopifyService] Missing required parameters for fulfillOrder');
+      return { success: false, error: 'Missing required parameters' };
+    }
 
-module.exports = { getUnfulfilledOrders };
+    const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    if (!accessToken) {
+      console.error('[shopifyService] No SHOPIFY_ADMIN_ACCESS_TOKEN found. Cannot fulfill.');
+      return { success: false, error: 'No access token' };
+    }
+
+    console.log(`[shopifyService] Beginning fulfillment for order ${orderName} (${courierName}) with CN: ${trackingNum}`);
+
+    // 1. Resolve numeric order ID by order name
+    const orderSearchRes = await axios.get(
+      `https://${shop}/admin/api/2025-01/orders.json`,
+      {
+        params: {
+          name: orderName,
+          status: 'any',
+          limit: 1,
+        },
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const orders = orderSearchRes.data?.orders || [];
+    if (orders.length === 0) {
+      console.error(`[shopifyService] Order not found with name: ${orderName}`);
+      return { success: false, error: `Order ${orderName} not found` };
+    }
+
+    const shopifyOrder = orders[0];
+    const orderId = shopifyOrder.id;
+
+    // 2. Fetch fulfillment orders
+    const foResponse = await axios.get(
+      `https://${shop}/admin/api/2025-01/orders/${orderId}/fulfillment_orders.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const fulfillmentOrders = foResponse.data?.fulfillment_orders || [];
+    const fulfillable = fulfillmentOrders.filter(
+      fo => fo.status === 'open' || fo.status === 'in_progress'
+    );
+
+    if (fulfillable.length === 0) {
+      console.log(`[shopifyService] Order ${orderName} has no open/in_progress fulfillment orders. Already fulfilled?`);
+      return { success: true, message: 'No open fulfillment orders to fulfill' };
+    }
+
+    // 3. Create tracking info and payload
+    let trackingUrl = '';
+    let trackingCompany = courierName;
+    if (courierName.toLowerCase() === 'tcs') {
+      trackingUrl = `https://www.tcsexpress.com/track/`;
+      trackingCompany = 'TCS';
+    } else if (courierName.toLowerCase() === 'postex') {
+      trackingUrl = `https://postex.pk/tracking`;
+      trackingCompany = 'PostEx';
+    }
+
+    const lineItemsByFulfillmentOrder = fulfillable.map(fo => ({
+      fulfillment_order_id: fo.id,
+    }));
+
+    const fulfillmentPayload = {
+      fulfillment: {
+        line_items_by_fulfillment_order: lineItemsByFulfillmentOrder,
+        tracking_info: {
+          number: trackingNum.toString(),
+          url: trackingUrl,
+          company: trackingCompany,
+        },
+        notify_customer: true,
+      },
+    };
+
+    console.log(`[shopifyService] Creating fulfillment for ${orderName}...`);
+    const response = await axios.post(
+      `https://${shop}/admin/api/2025-01/fulfillments.json`,
+      fulfillmentPayload,
+      {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log(`[shopifyService] Successfully fulfilled ${orderName} on Shopify.`);
+    return { success: true, data: response.data };
+
+  } catch (error) {
+    console.error(`[shopifyService] Error fulfilling order ${orderName}:`, error.message);
+    if (error.response) {
+      console.error(
+        '[shopifyService] Shopify API responded with:',
+        error.response.status,
+        JSON.stringify(error.response.data)
+      );
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+module.exports = {
+  getUnfulfilledOrders,
+  fulfillOrder,
+};
