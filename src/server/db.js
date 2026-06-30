@@ -56,6 +56,21 @@ const initDB = async () => {
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_amount DECIMAL(15,2) DEFAULT 0;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_sheet_id INTEGER;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_status VARCHAR(50);
+
+    -- Account feature flags: only present in CREATE TABLE, so pre-existing tables miss them.
+    -- A missing auto_fulfillment column reads as undefined → falsy → Shopify fulfillment is skipped.
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS auto_fulfillment BOOLEAN DEFAULT true;
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS auto_save_tracking BOOLEAN DEFAULT false;
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS mark_paid_zero BOOLEAN DEFAULT true;
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS auto_calc_weight BOOLEAN DEFAULT false;
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS auto_calc_pieces BOOLEAN DEFAULT false;
+    ALTER TABLE tcs_accounts    ADD COLUMN IF NOT EXISTS add_order_notes BOOLEAN DEFAULT false;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_fulfillment BOOLEAN DEFAULT true;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_save_tracking BOOLEAN DEFAULT false;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS mark_paid_zero BOOLEAN DEFAULT true;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_calc_weight BOOLEAN DEFAULT false;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_calc_pieces BOOLEAN DEFAULT false;
+    ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS add_order_notes BOOLEAN DEFAULT false;
   `;
 
   // ── NEW: dedicated token store ───────────────────────────────────────────────

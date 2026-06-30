@@ -881,15 +881,23 @@ async function bookShipment(payload) {
       accountId,
     });
 
+    let fulfillment = null;
     if (account.auto_fulfillment) {
       try {
-        await shopifyService.fulfillOrder(shop, bookingDetails.orderId, consignmentNo, 'TCS');
+        fulfillment = await shopifyService.fulfillOrder(shop, bookingDetails.orderId, consignmentNo, 'TCS');
+        if (!fulfillment.success) {
+          console.error('[TCS Booking] Shopify fulfillment failed (booking still saved):', fulfillment.error);
+        }
       } catch (err) {
         console.error('[TCS Booking] Failed to fulfill order on Shopify (non-fatal):', err.message);
+        fulfillment = { success: false, error: err.message };
       }
+    } else {
+      console.log('[TCS Booking] auto_fulfillment disabled for account; skipping Shopify fulfillment.');
+      fulfillment = { success: false, skipped: true, error: 'auto_fulfillment disabled for this account' };
     }
 
-    return { success: true, trackingNumber: consignmentNo, consignmentNo, traceid };
+    return { success: true, trackingNumber: consignmentNo, consignmentNo, traceid, fulfillment };
 
   } catch (error) {
     console.error('TCS Booking Error:', error.response?.data || error.message);

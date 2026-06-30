@@ -268,6 +268,9 @@ export default function BookingWorkbench({ shop }) {
         if (result.success && result.trackingNumber) {
           successCount++;
           handleUpdateOrder(order.id, 'tracking_number', result.trackingNumber);
+          if (result.fulfillment && result.fulfillment.success === false && !result.fulfillment.skipped) {
+            setErrors(prev => [...prev, `Order ${order.order_number}: booked (CN ${result.trackingNumber}) but Shopify NOT marked fulfilled — ${result.fulfillment.error}`]);
+          }
         } else {
           const errMsg = result.error || 'No tracking number returned by courier';
           setErrors(prev => [...prev, `Order ${order.order_number}: ${errMsg}`]);

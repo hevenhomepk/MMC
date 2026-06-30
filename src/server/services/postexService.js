@@ -188,17 +188,26 @@ async function bookShipment(payload) {
         accountId: accountId
       });
 
+      let fulfillment = null;
       if (acc.auto_fulfillment) {
         try {
-          await shopifyService.fulfillOrder(shop, bookingDetails.orderId, trackingNumber, 'PostEx');
+          fulfillment = await shopifyService.fulfillOrder(shop, bookingDetails.orderId, trackingNumber, 'PostEx');
+          if (!fulfillment.success) {
+            console.error('[PostEx Booking] Shopify fulfillment failed (booking still saved):', fulfillment.error);
+          }
         } catch (err) {
           console.error('[PostEx Booking] Failed to fulfill order on Shopify (non-fatal):', err.message);
+          fulfillment = { success: false, error: err.message };
         }
+      } else {
+        console.log('[PostEx Booking] auto_fulfillment disabled for account; skipping Shopify fulfillment.');
+        fulfillment = { success: false, skipped: true, error: 'auto_fulfillment disabled for this account' };
       }
 
-      return { 
-        success: true, 
-        trackingNumber: trackingNumber 
+      return {
+        success: true,
+        trackingNumber: trackingNumber,
+        fulfillment
       };
     } else {
       return { success: false, error: response.data?.statusMessage || 'Order creation failed' };

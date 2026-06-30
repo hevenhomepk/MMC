@@ -242,14 +242,19 @@ async function fulfillOrder(shop, orderName, trackingNum, courierName) {
 
   } catch (error) {
     console.error(`[shopifyService] Error fulfilling order ${orderName}:`, error.message);
+    let detail = error.message;
     if (error.response) {
-      console.error(
-        '[shopifyService] Shopify API responded with:',
-        error.response.status,
-        JSON.stringify(error.response.data)
-      );
+      const status = error.response.status;
+      const body = JSON.stringify(error.response.data?.errors || error.response.data);
+      console.error('[shopifyService] Shopify API responded with:', status, body);
+      detail = `Shopify API ${status}: ${body}`;
+      if (status === 401 || status === 403) {
+        detail += ' — the Admin API access token is missing fulfillment write scopes ' +
+          '(write_merchant_managed_fulfillment_orders / write_fulfillments). ' +
+          'Grant these to the custom app in the Shopify admin and reinstall/regenerate the token.';
+      }
     }
-    return { success: false, error: error.message };
+    return { success: false, error: detail, status: error.response?.status };
   }
 }
 
