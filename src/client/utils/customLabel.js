@@ -1,22 +1,63 @@
 // src/client/utils/customLabel.js
 // Renders app-generated ("custom") courier labels with the merchant's own logo,
-// then opens a print window. Barcodes via JsBarcode, QR via qrcode.
-import JsBarcode from 'jsbarcode';
-import QRCode from 'qrcode';
+// then opens a print window.
+//
+// NOTE: JsBarcode + QR are loaded at RUNTIME from a CDN (not bundled). This keeps
+// the webpack build free of these dependencies, so the deploy VM — which rebuilds
+// from source without `npm install` — can never fail on a missing module. If the
+// CDN is unreachable, labels still print (barcode falls back to text, QR omitted).
+
+const CDN = {
+  jsbarcode: 'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js', // window.JsBarcode
+  qrcode:    'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js',           // window.qrcode
+};
+
+const _scripts = {};
+function loadScript(src) {
+  if (_scripts[src]) return _scripts[src];
+  _scripts[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+  return _scripts[src];
+}
+
+async function ensureLibs() {
+  // Best-effort: don't block printing if a CDN is unreachable.
+  await Promise.allSettled([loadScript(CDN.jsbarcode), loadScript(CDN.qrcode)]);
+}
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function barcodeDataUrl(value) {
+  if (typeof window.JsBarcode !== 'function') return '';
   try {
     const canvas = document.createElement('canvas');
-    JsBarcode(canvas, String(value || ''), {
+    window.JsBarcode(canvas, String(value || ''), {
       format: 'CODE128', displayValue: true, fontSize: 14,
       height: 45, margin: 0, width: 1.6,
     });
     return canvas.toDataURL('image/png');
   } catch (e) {
     console.warn('[customLabel] barcode failed for', value, e.message);
+    return '';
+  }
+}
+
+function qrDataUrl(value) {
+  if (typeof window.qrcode !== 'function') return '';
+  try {
+    const qr = window.qrcode(0, 'M'); // type 0 = auto-size, error correction level M
+    qr.addData(String(value || ''));
+    qr.make();
+    return qr.createDataURL(4, 0); // (cellSize, margin) → GIF data URL
+  } catch (e) {
+    console.warn('[customLabel] QR failed for', value, e.message);
     return '';
   }
 }
@@ -89,13 +130,11 @@ export async function printCustomLabels(bookings, settings = {}) {
   if (!bookings || bookings.length === 0) return;
   const size = settings.label_size || 'A4-3';
 
-  const labels = [];
-  for (const b of bookings) {
-    const barcodeImg = barcodeDataUrl(b.tracking_number);
-    let qrImg = '';
-    try { qrImg = await QRCode.toDataURL(String(b.tracking_number || ''), { margin: 1, width: 120 }); } catch { /* optional */ }
-    labels.push(labelHtml(b, settings, barcodeImg, qrImg));
-  }
+  await ensureLibs();
+
+  const labels = bookings.map(b =>
+    labelHtml(b, settings, barcodeDataUrl(b.tracking_number), qrDataUrl(b.tracking_number))
+  );
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels</title>
   <style>
