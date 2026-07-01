@@ -6,8 +6,9 @@ module.exports = {
   entry: './src/client/index.jsx',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js',
+    filename: 'bundle.[contenthash].js', // content hash busts browser cache on every change
     publicPath: '/',
+    clean: true,                          // remove stale bundles from dist on each build
   },
   resolve: {
     extensions: ['.js', '.jsx'],
