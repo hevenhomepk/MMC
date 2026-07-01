@@ -9,7 +9,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // 5mb to allow base64 logo uploads in settings
 app.use(cookieParser());
 
 app.use(express.static(path.join(__dirname, '../../dist')));
@@ -25,6 +25,7 @@ app.use('/api/loadsheets', authMiddleware, require('./routes/loadsheets'));
 app.use('/api/returns', authMiddleware, require('./routes/returns'));
 app.use('/api/analytics', authMiddleware, require('./routes/analytics'));
 app.use('/api/shopify', authMiddleware, require('./routes/shopify'));
+app.use('/api/settings', authMiddleware, require('./routes/settings'));
 app.use('/api/webhook', authMiddleware, require('./routes/webhook'));
 
 // Fallback for SPA routes

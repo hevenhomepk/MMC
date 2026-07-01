@@ -1,7 +1,19 @@
 // src/client/components/CourierLogs.jsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { printCustomLabels } from '../utils/customLabel';
 
 const STATUSES = ['All', 'Booked', 'Shipped', 'Loadsheet', 'Assigned', 'Pending', 'Refused', 'Delivered', 'Returned', 'RTS', 'Cancelled'];
+
+// TCS CNPrint printtype values (see devconnect.tcscourier.com CNPrint API)
+const PRINT_TYPES = [
+  { value: '3', label: '6x4 Label' },
+  { value: '4', label: '3 Labels / Page' },
+  { value: '1', label: '3 Copies / Page' },
+  { value: '2', label: 'Single / Page' },
+  { value: '5', label: "Shipper's Copy" },
+  { value: '6', label: 'Shipment Label' },
+  { value: '7', label: 'Shipment Label 6x4' },
+];
 
 const styles = {
   container: { padding: '24px', maxWidth: '1400px', margin: '0 auto' },
@@ -88,6 +100,10 @@ export default function CourierLogs({ shop, courierFilter }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [showActions, setShowActions] = useState(false);
+
+  // Selection + printing
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [printType, setPrintType] = useState('3'); // default: 6x4 label
   
   // Sorting
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
@@ -142,6 +158,71 @@ export default function CourierLogs({ shop, courierFilter }) {
 
     return result;
   }, [bookings, activeTab, searchQuery, filterStatus, courierFilter, sortConfig]);
+
+  const toggleRow = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected = filteredLogs.length > 0 && filteredLogs.every(b => selectedIds.has(b.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) filteredLogs.forEach(b => next.delete(b.id));
+      else filteredLogs.forEach(b => next.add(b.id));
+      return next;
+    });
+  };
+
+  const handlePrint = () => {
+    const selected = filteredLogs.filter(b => selectedIds.has(b.id));
+    if (selected.length === 0) {
+      alert('Please select at least one order to print.');
+      return;
+    }
+
+    // Group by courier — each courier has its own native label API.
+    const tcsCns = selected.filter(b => b.courier === 'TCS').map(b => b.tracking_number).filter(Boolean);
+    const otherCouriers = [...new Set(selected.filter(b => b.courier !== 'TCS').map(b => b.courier))];
+
+    if (tcsCns.length > 0) {
+      const params = new URLSearchParams({
+        shop,
+        cn: tcsCns.join(','),
+        printtype: printType,
+      });
+      window.open(`/api/tcs/print-label?${params.toString()}`, '_blank');
+    }
+
+    if (otherCouriers.length > 0) {
+      alert(`Label printing for ${otherCouriers.join(', ')} is not available yet. Only TCS labels were opened.`);
+    }
+  };
+
+  // Custom app-rendered label with the merchant's own logo (works for any courier).
+  const handleCustomPrint = async () => {
+    const selected = filteredLogs.filter(b => selectedIds.has(b.id));
+    if (selected.length === 0) {
+      alert('Please select at least one order to print.');
+      return;
+    }
+    try {
+      const resp = await fetch(`/api/settings?shop=${encodeURIComponent(shop)}`);
+      const data = await resp.json();
+      const settings = (data && data.settings) || {};
+      if (!settings.logo_data) {
+        const go = confirm('No custom logo uploaded yet (set it in Shipper Settings → Label Settings). Print without a logo?');
+        if (!go) return;
+      }
+      await printCustomLabels(selected, settings);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate custom labels: ' + e.message);
+    }
+  };
 
   const SortIcon = ({ col }) => {
     if (sortConfig.key !== col) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>;
@@ -201,9 +282,25 @@ export default function CourierLogs({ shop, courierFilter }) {
           </select>
         </div>
 
+        <div style={{ width: '170px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Label Format</div>
+          <select
+            style={{ ...styles.input, width: '100%', height: '42px' }}
+            value={printType}
+            onChange={e => setPrintType(e.target.value)}
+          >
+            {PRINT_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </div>
+
         <div style={{ display: 'flex', gap: '8px', marginTop: '24px', position: 'relative' }}>
           <button style={{ ...styles.btn('primary'), height: '42px' }}>Search</button>
-          <button style={{ ...styles.btn(), height: '42px' }}>Print</button>
+          <button style={{ ...styles.btn(), height: '42px' }} onClick={handlePrint}>
+            Print{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+          </button>
+          <button style={{ ...styles.btn(), height: '42px', borderColor: '#8b5cf6', color: '#8b5cf6' }} onClick={handleCustomPrint}>
+            Custom Label
+          </button>
           <button style={{ ...styles.btn('secondary'), height: '42px', border: '1px solid #3b82f6', color: '#3b82f6' }}>Track</button>
           
           <div style={{ position: 'relative' }}>
@@ -263,7 +360,9 @@ export default function CourierLogs({ shop, courierFilter }) {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: '40px' }}><input type="checkbox" /></th>
+              <th style={{ ...styles.th, width: '40px' }}>
+                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} />
+              </th>
               <th style={{ ...styles.th, cursor: 'pointer' }} onClick={() => requestSort('id')}>
                 # <SortIcon col="id" />
               </th>
@@ -281,7 +380,9 @@ export default function CourierLogs({ shop, courierFilter }) {
           <tbody>
             {filteredLogs.map((b, i) => (
               <tr key={b.id}>
-                <td style={styles.td}><input type="checkbox" /></td>
+                <td style={styles.td}>
+                  <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleRow(b.id)} />
+                </td>
                 <td style={styles.td}>{i + 1}</td>
                 <td style={styles.td}>{new Date(b.created_at).toLocaleDateString()}</td>
                 <td style={{ ...styles.td, fontWeight: '700' }}>{b.order_id}</td>

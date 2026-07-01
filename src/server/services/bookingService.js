@@ -15,26 +15,34 @@ async function getAllBookings(shop) {
 }
 
 async function saveBooking(data) {
-  const { shop, orderId, courier, trackingNumber, traceid, consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount, accountId } = data;
+  const {
+    shop, orderId, courier, trackingNumber, traceid,
+    consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount, accountId,
+    consigneeAddress, consigneeEmail, productDetails, weight, pieces, remarks, serviceType,
+  } = data;
   try {
     const query = `
       INSERT INTO bookings (
-        shop_domain, order_id, courier, tracking_number, 
-        consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id, traceid
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        shop_domain, order_id, courier, tracking_number,
+        consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id, traceid,
+        consignee_address, consignee_email, product_details, weight, pieces, remarks, service_type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
     `;
     const result = await db.query(query, [
       shop, orderId, courier, trackingNumber,
-      consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount || 0, accountId, traceid || null
+      consigneeName, consigneePhone, consigneeCity, codAmount, orderAmount || 0, accountId, traceid || null,
+      consigneeAddress || null, consigneeEmail || null, productDetails || null,
+      weight != null ? String(weight) : null, parseInt(pieces) || 1, remarks || null, serviceType || null,
     ]);
     return result.rows[0];
   } catch (error) {
-    // If traceid column doesn't exist yet, fall back without it
-    if (error.message && error.message.includes('traceid')) {
+    // If newer columns don't exist yet on this DB, fall back to the core columns.
+    if (error.message && /column .* does not exist/i.test(error.message)) {
+      console.warn('[saveBooking] Falling back to core columns only:', error.message);
       const query = `
         INSERT INTO bookings (
-          shop_domain, order_id, courier, tracking_number, 
+          shop_domain, order_id, courier, tracking_number,
           consignee_name, consignee_phone, consignee_city, cod_amount, order_amount, account_id
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *

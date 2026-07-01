@@ -185,7 +185,14 @@ async function bookShipment(payload) {
         consigneeCity: bookingDetails.consigneeCity,
         codAmount: parseFloat(bookingDetails.codAmount),
         orderAmount: parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
-        accountId: accountId
+        accountId: accountId,
+        consigneeAddress: bookingDetails.consigneeAddress,
+        consigneeEmail: bookingDetails.consigneeEmail,
+        productDetails: bookingDetails.productDesc,
+        weight: bookingDetails.weight,
+        pieces: bookingDetails.pieces,
+        remarks: bookingDetails.remarks,
+        serviceType: acc.order_type
       });
 
       let fulfillment = null;

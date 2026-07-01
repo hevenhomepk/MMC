@@ -869,16 +869,23 @@ async function bookShipment(payload) {
 
     await bookingService.saveBooking({
       shop,
-      orderId:        bookingDetails.orderId,
-      courier:        'TCS',
-      trackingNumber: consignmentNo,
+      orderId:          bookingDetails.orderId,
+      courier:          'TCS',
+      trackingNumber:   consignmentNo,
       traceid,
-      consigneeName:  bookingDetails.consigneeName,
-      consigneePhone: bookingDetails.consigneePhone,
-      consigneeCity:  bookingDetails.consigneeCity,
-      codAmount:      parseFloat(bookingDetails.codAmount),
-      orderAmount:    parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
+      consigneeName:    bookingDetails.consigneeName,
+      consigneePhone:   bookingDetails.consigneePhone,
+      consigneeCity:    bookingDetails.consigneeCity,
+      codAmount:        parseFloat(bookingDetails.codAmount),
+      orderAmount:      parseFloat(bookingDetails.orderAmount || bookingDetails.codAmount),
       accountId,
+      consigneeAddress: bookingDetails.consigneeAddress,
+      consigneeEmail:   bookingDetails.consigneeEmail,
+      productDetails:   bookingDetails.productDesc,
+      weight:           bookingDetails.weight,
+      pieces:           bookingDetails.pieces,
+      remarks:          bookingDetails.remarks,
+      serviceType:      serviceCode,
     });
 
     let fulfillment = null;
@@ -938,6 +945,70 @@ async function fetchLoadsheets(shop, fromDate, toDate) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Label printing (TCS native CNPrint API → PDF)
+// GET {baseUrl}/print/label?accesstoken&consignmentno&shipperDetails&printtype&accounttype
+// printtype: 1=3 copies/page, 2=single/page, 3=6x4 label, 4=3 labels/page,
+//            5=Shipper's Copy, 6=Shipment Label, 7=Shipment Label 6x4
+// accounttype: 1=Forward, 2=Reverse
+// ─────────────────────────────────────────────────────────────────────────────
+async function printLabel({ shop, consignmentNos, printType = 3, shipperDetails = false, accountType = 1 }) {
+  if (!shop) throw new Error('Shop identifier is required.');
+
+  const cns = (Array.isArray(consignmentNos) ? consignmentNos : [consignmentNos])
+    .map(c => (c == null ? '' : String(c).trim()))
+    .filter(Boolean);
+  if (cns.length === 0) throw new Error('At least one consignment number is required to print a label.');
+
+  const accounts = await getAccounts(shop);
+  const activeAccount = accounts.find(a => a.is_default && a.is_enabled) || accounts[0];
+  if (!activeAccount) throw new Error('No active TCS account found.');
+
+  const { token, baseUrl } = await getTcsToken(
+    activeAccount.username,
+    decrypt(activeAccount.password),
+    shop
+  );
+
+  // Try the resolved env first, then fall back to the other TCS environment.
+  const envUrls = [baseUrl, ...TCS_ENVIRONMENTS.map(e => e.baseUrl)]
+    .filter((u, i, arr) => u && arr.indexOf(u) === i);
+
+  let lastErr = null;
+  for (const url of envUrls) {
+    try {
+      const gwToken = getGatewayToken(url);
+      const response = await axios.get(`${url}/print/label`, {
+        params: {
+          accesstoken:   token,
+          consignmentno: cns.join(','),   // TCS accepts comma-separated CNs for multi-label sheets
+          shipperDetails: !!shipperDetails,
+          printtype:     parseInt(printType, 10) || 3,
+          accounttype:   parseInt(accountType, 10) || 1,
+        },
+        headers: { 'Authorization': `Bearer ${gwToken}` },
+        responseType: 'arraybuffer',
+        timeout: 20000,
+      });
+
+      const buf = Buffer.from(response.data);
+      // TCS sometimes returns a JSON error body with a 200; a real PDF starts with "%PDF".
+      if (buf.slice(0, 4).toString('latin1') !== '%PDF') {
+        let msg = buf.toString('utf8').slice(0, 300);
+        try { msg = JSON.parse(buf.toString('utf8')).message || msg; } catch { /* keep raw */ }
+        throw new Error(`TCS did not return a PDF label: ${msg}`);
+      }
+      console.log(`[TCS Print] Generated label PDF for CN(s) ${cns.join(',')} via ${url} (${buf.length} bytes)`);
+      return { buffer: buf, contentType: 'application/pdf' };
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[TCS Print] Failed on ${url}:`, e.response?.status || '', e.message);
+    }
+  }
+
+  throw new Error(lastErr?.message || 'Failed to generate TCS label.');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 module.exports = {
@@ -953,4 +1024,5 @@ module.exports = {
   toggleAccountStatus,
   bookShipment,
   fetchLoadsheets,
+  printLabel,
 };

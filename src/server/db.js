@@ -71,6 +71,30 @@ const initDB = async () => {
     ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_calc_weight BOOLEAN DEFAULT false;
     ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS auto_calc_pieces BOOLEAN DEFAULT false;
     ALTER TABLE postex_accounts ADD COLUMN IF NOT EXISTS add_order_notes BOOLEAN DEFAULT false;
+
+    -- Extra booking fields needed to render custom labels (address/products/etc.).
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS consignee_address TEXT;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS consignee_email VARCHAR(255);
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS product_details TEXT;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS weight VARCHAR(20);
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pieces INTEGER DEFAULT 1;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remarks TEXT;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_type VARCHAR(50);
+  `;
+
+  // ── Per-shop settings: custom label logo + brand/shipper profile ────────────
+  const createShopSettingsTableQuery = `
+    CREATE TABLE IF NOT EXISTS shop_settings (
+      shop_domain     VARCHAR(255) PRIMARY KEY,
+      logo_data       TEXT,                       -- data URL or external image URL
+      label_size      VARCHAR(50) DEFAULT 'A4-3', -- A4-3 | A4-1 | THERMAL | COPIES-3
+      website         VARCHAR(255),
+      shipper_name    VARCHAR(255),
+      shipper_phone   VARCHAR(50),
+      shipper_city    VARCHAR(100),
+      shipper_address TEXT,
+      updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
   `;
 
   // ── NEW: dedicated token store ───────────────────────────────────────────────
@@ -209,6 +233,7 @@ const initDB = async () => {
     await pool.query(createTcsTokensTableQuery);
     await pool.query(createPickupAddressesTableQuery);
     await pool.query(createCostCentersTableQuery);
+    await pool.query(createShopSettingsTableQuery);
     
     // One-time database cleanup for user request: change order #1001 and #1002 to unfulfilled (unbooked)
     await pool.query(`

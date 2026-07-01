@@ -1,5 +1,11 @@
 // src/client/components/ShipperSettings.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+const LABEL_SIZES = [
+  { value: 'A4-3', label: 'A4 Standard - 3 Per Page' },
+  { value: 'A4-1', label: 'A4 - Single Per Page' },
+  { value: 'THERMAL', label: 'Thermal - 4x6' },
+];
 
 const styles = {
   page: { padding: '24px', minHeight: '80vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'Inter, sans-serif', maxWidth: '1200px', margin: '0 auto', display: 'flex', gap: '24px', alignItems: 'flex-start' },
@@ -37,10 +43,77 @@ export default function ShipperSettings({ shop }) {
     { name: '', phone: '', city: '', address: '' }
   ]);
 
+  const [website, setWebsite] = useState(shop || '');
+  const [labelSize, setLabelSize] = useState('A4-3');
+  const [logoData, setLogoData] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!shop) return;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/settings?shop=${encodeURIComponent(shop)}`);
+        const data = await resp.json();
+        if (data.success && data.settings) {
+          const s = data.settings;
+          setWebsite(s.website || shop || '');
+          setLabelSize(s.label_size || 'A4-3');
+          setLogoData(s.logo_data || null);
+          setProfiles(prev => {
+            const next = [...prev];
+            next[0] = {
+              name: s.shipper_name || '',
+              phone: s.shipper_phone || '',
+              city: s.shipper_city || '',
+              address: s.shipper_address || '',
+            };
+            return next;
+          });
+        }
+      } catch (e) { console.error('Failed to load settings', e); }
+    })();
+  }, [shop]);
+
   const handleProfileChange = (index, field, value) => {
     const newProfiles = [...profiles];
     newProfiles[index][field] = value;
     setProfiles(newProfiles);
+  };
+
+  const handleLogoFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('Logo must be under 2MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setLogoData(reader.result); // data URL
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const body = {
+        shop,
+        website,
+        label_size: labelSize,
+        logo_data: logoData,
+        shipper_name: profiles[0].name,
+        shipper_phone: profiles[0].phone,
+        shipper_city: profiles[0].city,
+        shipper_address: profiles[0].address,
+      };
+      const resp = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (data.success) alert('Settings saved.');
+      else alert('Failed to save: ' + (data.error || 'unknown error'));
+    } catch (e) {
+      alert('Failed to save settings: ' + e.message);
+    }
+    setSaving(false);
   };
 
   return (
@@ -105,24 +178,29 @@ export default function ShipperSettings({ shop }) {
             <span style={{ fontSize: '16px' }}>📦</span> Label Settings
           </div>
           <div style={styles.cardBody}>
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
               <div style={{ ...styles.inputGroup, flex: 1 }}>
                 <div style={styles.label}>Website</div>
-                <input style={styles.input} defaultValue={shop || "codorders.myshopify.com"} />
+                <input style={styles.input} value={website} onChange={e => setWebsite(e.target.value)} />
               </div>
               <div style={{ ...styles.inputGroup, flex: 1 }}>
-                <div style={styles.label}>Logo Link (300x100px)</div>
-                <input style={styles.input} />
+                <div style={styles.label}>Custom Logo (replaces courier logo, ~300x100px)</div>
+                <input type="file" accept="image/*" style={{ ...styles.input, padding: '7px' }} onChange={handleLogoFile} />
               </div>
               <div style={{ ...styles.inputGroup, flex: 1 }}>
                 <div style={styles.label}>Label Size</div>
-                <select style={styles.input} defaultValue="A4 Standard - 3 Per Page">
-                  <option value="A4 Standard - 3 Per Page">A4 Standard - 3 Per Page</option>
-                  <option value="A4 - 4 Per Page">A4 - 4 Per Page</option>
-                  <option value="Thermal - 4x6">Thermal - 4x6</option>
+                <select style={styles.input} value={labelSize} onChange={e => setLabelSize(e.target.value)}>
+                  {LABEL_SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
+            {logoData && (
+              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={styles.label}>Current logo:</span>
+                <img src={logoData} alt="logo preview" style={{ maxHeight: '46px', maxWidth: '160px', objectFit: 'contain', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px', background: '#fff' }} />
+                <button style={{ ...styles.videoBtn, width: 'auto', padding: '6px 12px' }} onClick={() => setLogoData(null)}>Remove</button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -157,7 +235,9 @@ export default function ShipperSettings({ shop }) {
           </div>
         </div>
 
-        <button style={styles.saveBtn} onClick={() => alert('Settings Saved')}>Save Settings</button>
+        <button style={{ ...styles.saveBtn, opacity: saving ? 0.6 : 1 }} disabled={saving} onClick={handleSave}>
+          {saving ? 'Saving…' : 'Save Settings'}
+        </button>
       </div>
     </div>
   );

@@ -205,4 +205,39 @@ router.post('/book', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Print consignment label(s) as a PDF (TCS native CNPrint API)
+// GET /api/tcs/print-label?shop=...&cn=CN1,CN2&printtype=3&shipperDetails=false&accounttype=1
+// Served as a GET so the client can open it directly in a new tab / print dialog.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/print-label', async (req, res) => {
+  const { shop, cn, printtype, shipperDetails, accounttype } = req.query;
+
+  if (!shop || !cn) {
+    return res.status(400).json({
+      success: false,
+      error: 'shop and cn (consignment number) are required.',
+      code: 'MISSING_FIELDS',
+      retryable: false,
+    });
+  }
+
+  try {
+    const consignmentNos = String(cn).split(',').map(s => s.trim()).filter(Boolean);
+    const { buffer, contentType } = await tcsService.printLabel({
+      shop,
+      consignmentNos,
+      printType: printtype,
+      shipperDetails: shipperDetails === 'true' || shipperDetails === '1',
+      accountType: accounttype,
+    });
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="tcs-labels-${Date.now()}.pdf"`);
+    return res.send(buffer);
+  } catch (e) {
+    return sendError(res, e, 500);
+  }
+});
+
 module.exports = router;
