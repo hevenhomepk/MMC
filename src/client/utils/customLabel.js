@@ -327,7 +327,7 @@ const BASE_CSS = `
   * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
   html, body { margin: 0; padding: 0; color: #111; }
   .item { break-inside: avoid; }
-  .courier-logo svg { display: block; max-height: 30px; width: auto; }
+  .courier-logo img, .courier-logo svg { display: block; max-height: 38px; max-width: 150px; width: auto; object-fit: contain; }
   .courier-logo-text { font-weight: 900; font-size: 16px; }
   .brand-mark { max-height: 26px; max-width: 120px; object-fit: contain; display: block; margin-bottom: 4px; }
 
@@ -335,7 +335,10 @@ const BASE_CSS = `
   .lbl3 { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1.5px solid #000; }
   .lbl3 td { border: 1px solid #000; vertical-align: top; padding: 5px 7px; font-size: 10.5px; line-height: 1.35; }
   .lbl3 .hdr td { text-align: center; font-weight: 800; padding: 4px; }
-  .lbl3 .cells td { height: 118px; }
+  /* Body cells are content-height. Scope any structural sizing to the DIRECT
+     body cells (child combinator) so it never cascades into the nested .pgrid
+     table cells and stretches the label. */
+  .lbl3 > tbody > tr.cells > td { vertical-align: top; }
   .lbl3 .cust { width: 34%; padding: 0; }
   .lbl3 .brand { width: 29%; }
   .lbl3 .parcel { width: 37%; padding: 0; }
