@@ -227,6 +227,47 @@ function thermalBlock(b, settings, assets) {
   </div>`;
 }
 
+// ── LAYOUT B2: landscape thermal (6x4 / 6x3) ─────────────────────────────────
+// Wide-but-short pages can't fit the tall vertical stack, so these use a 2-column
+// (Customer Information | Shipment Information) grid with pipe-separated detail rows.
+function thermalLandscapeBlock(b, settings, assets) {
+  const f = fieldValues(b, settings);
+  const sep = ' &nbsp;|&nbsp; ';
+  const detail = [
+    `<b>Date:</b> ${esc(f.date)}`, `<b>Service:</b> ${esc(f.service)}`, `<b>Fragile:</b> ${esc(f.fragile)}`,
+    `<b>Pieces:</b> ${esc(f.pieces)}`, `<b>Qty:</b> ${esc(f.pieces)}`, `<b>Weight:</b> ${esc(f.weight)}`,
+  ].join(sep);
+  return `
+  <div class="item thml">
+    <table class="thml-grid">
+      <tr class="hdr"><td>Customer Information</td><td>Shipment Information</td></tr>
+      <tr class="cells">
+        <td class="cust">
+          <div class="sub">
+            <div><b>Name:</b> ${esc(f.name)}</div>
+            <div><b>Phone:</b> ${esc(f.phone)}</div>
+            <div><b>Address:</b> ${esc(f.address)}</div>
+          </div>
+          <div class="sub"><b>Destination:</b> ${esc(f.dest)}</div>
+          <div class="sub cod">
+            <span class="cod-amt"><b>COD:</b> ${esc(f.amount)}</span>
+            ${assets.track ? `<img src="${assets.track}" />` : ''}
+          </div>
+        </td>
+        <td class="ship">
+          <div class="ship-top">${assets.logo}${assets.qr ? `<img class="qr" src="${assets.qr}" />` : ''}</div>
+          <div class="track">${assets.track ? `<img class="bc" src="${assets.track}" />` : ''}<div class="track-no">${esc(f.tracking)}</div></div>
+          <div class="order"><b>Order:</b> ${esc(f.order)}</div>
+        </td>
+      </tr>
+    </table>
+    <div class="thml-row detail">${detail}</div>
+    <div class="thml-row"><b>Remarks:</b> ${esc(f.remarks)}</div>
+    <div class="thml-row products"><b>Products:</b> ${esc(f.products)}</div>
+    <div class="thml-row shipper"><b>Shipper:</b> ${esc(f.shipperName)}${sep}${esc(f.shipperPhone)}${sep}${esc(f.shipperAddress)}</div>
+  </div>`;
+}
+
 // ── LAYOUT C: invoice block ──────────────────────────────────────────────────
 // Parse "1x Item, 2 x Item2" / "[ 1 x Item ]" style product_details into rows.
 function parseItems(products) {
@@ -305,8 +346,8 @@ const FORMATS = {
   'A4-3':            { kind: 'label3',       page: '@page{size:A4;margin:7mm}',     brk: '.item:nth-of-type(3n){page-break-after:always}' },
   'A4-4':            { kind: 'label3',       page: '@page{size:A4;margin:6mm}',     brk: '.item:nth-of-type(4n){page-break-after:always}', compact: true },
   '8X4':             { kind: 'label3',       page: '@page{size:8in 4in;margin:4mm}', brk: '.item{page-break-after:always}', compact: true },
-  'THERMAL-6X3':     { kind: 'thermal',      page: '@page{size:6in 3in;margin:2mm}', brk: '.item{page-break-after:always}' },
-  'THERMAL-6X4':     { kind: 'thermal',      page: '@page{size:6in 4in;margin:3mm}', brk: '.item{page-break-after:always}' },
+  'THERMAL-6X3':     { kind: 'thermalLandscape', page: '@page{size:6in 3in;margin:2mm}', brk: '.item{page-break-after:always}' },
+  'THERMAL-6X4':     { kind: 'thermalLandscape', page: '@page{size:6in 4in;margin:3mm}', brk: '.item{page-break-after:always}' },
   'THERMAL-4X6':     { kind: 'thermal',      page: '@page{size:4in 6in;margin:3mm}', brk: '.item{page-break-after:always}' },
   'THERMAL-3X4':     { kind: 'thermal',      page: '@page{size:3in 4in;margin:2mm}', brk: '.item{page-break-after:always}' },
   'A4-LABEL-INVOICE':{ kind: 'labelInvoice', page: '@page{size:A4;margin:8mm}',      brk: '.item{page-break-after:always}' },
@@ -315,8 +356,9 @@ const FORMATS = {
 
 function renderOne(kind, b, settings, assets, fmt) {
   switch (kind) {
-    case 'label3':       return labelBlock3(b, settings, assets, { compact: fmt.compact });
-    case 'thermal':      return thermalBlock(b, settings, assets);
+    case 'label3':          return labelBlock3(b, settings, assets, { compact: fmt.compact });
+    case 'thermal':         return thermalBlock(b, settings, assets);
+    case 'thermalLandscape': return thermalLandscapeBlock(b, settings, assets);
     case 'invoice':      return invoiceBlock(b, settings, assets);
     case 'labelInvoice': return `<div class="item">${labelBlock3(b, settings, assets)}${invoiceBlock(b, settings, assets).replace('class="item inv"', 'class="inv"')}</div>`;
     default:             return labelBlock3(b, settings, assets);
@@ -381,6 +423,27 @@ const BASE_CSS = `
   .pgrid2 td:first-child { border-right: 1px solid #000; }
   .thm-box .shipper .sr { display: flex; justify-content: space-between; gap: 6px; }
   .thm-box .box-sec:last-child { border-bottom: none; }
+
+  /* ── Layout B2: landscape thermal (6x4 / 6x3) ── */
+  .thml { width: 100%; font-size: 10px; border: 1.5px solid #000; }
+  .thml-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .thml-grid td { vertical-align: top; }
+  .thml-grid td:first-child { border-right: 1px solid #000; }
+  .thml-grid .hdr td { text-align: center; font-weight: 800; padding: 3px; border-bottom: 1px solid #000; }
+  .thml-grid .cust, .thml-grid .ship { width: 50%; }
+  .thml-grid .cust .sub { border-bottom: 1px solid #000; padding: 5px 7px; line-height: 1.4; }
+  .thml-grid .cust .sub:last-child { border-bottom: none; }
+  .thml-grid .cust .cod { display: flex; align-items: center; gap: 8px; }
+  .thml-grid .cust .cod .cod-amt { font-size: 13px; font-weight: 800; white-space: nowrap; }
+  .thml-grid .cust .cod img { height: 22px; max-width: 150px; }
+  .thml-grid .ship .ship-top { display: flex; justify-content: space-between; align-items: center; padding: 5px 7px; }
+  .thml-grid .ship .ship-top .qr { width: 44px; height: 44px; }
+  .thml-grid .ship .track { text-align: center; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px; }
+  .thml-grid .ship .track .bc { height: 30px; max-width: 96%; }
+  .thml-grid .ship .track .track-no { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .thml-grid .ship .order { padding: 6px 7px; font-size: 12px; }
+  .thml-row { border-top: 1px solid #000; padding: 4px 7px; font-size: 10px; }
+  .thml-row.products { min-height: 32px; }
 
   /* ── Layout C: invoice ── */
   .inv { width: 100%; font-size: 11px; margin-top: 10px; }
