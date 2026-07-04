@@ -1,10 +1,19 @@
 // src/client/components/ShipperSettings.jsx
 import React, { useState, useEffect } from 'react';
 
+// Custom-label formats — the value is the code stored in shop_settings.label_size
+// and consumed by src/client/utils/customLabel.js. Labels mirror the Label Size
+// dropdown and the reference PDFs in Couriers/tcsformat.
 const LABEL_SIZES = [
   { value: 'A4-3', label: 'A4 Standard - 3 Per Page' },
-  { value: 'A4-1', label: 'A4 - Single Per Page' },
-  { value: 'THERMAL', label: 'Thermal - 4x6' },
+  { value: 'A4-4', label: 'A4 Standard - 4 Per Page' },
+  { value: '8X4', label: '8x4 inch - 1 Per Page' },
+  { value: 'THERMAL-6X3', label: '6x3 inch - Thermal' },
+  { value: 'THERMAL-6X4', label: '6x4 inch - Thermal' },
+  { value: 'THERMAL-4X6', label: '4x6 inch - Thermal' },
+  { value: 'THERMAL-3X4', label: '3x4 inch - Thermal' },
+  { value: 'A4-LABEL-INVOICE', label: 'A4 - Label & Invoice' },
+  { value: 'A4-INVOICE', label: 'A4 - Invoice only' },
 ];
 
 const styles = {
@@ -57,7 +66,10 @@ export default function ShipperSettings({ shop }) {
         if (data.success && data.settings) {
           const s = data.settings;
           setWebsite(s.website || shop || '');
-          setLabelSize(s.label_size || 'A4-3');
+          // Map legacy codes (A4-1, THERMAL, COPIES-3) onto the new format set.
+          const LEGACY = { 'A4-1': 'A4-3', 'THERMAL': 'THERMAL-4X6', 'COPIES-3': 'A4-3' };
+          const rawSize = s.label_size || 'A4-3';
+          setLabelSize(LEGACY[rawSize] || rawSize);
           setLogoData(s.logo_data || null);
           setProfiles(prev => {
             const next = [...prev];
