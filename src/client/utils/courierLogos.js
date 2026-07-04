@@ -4,7 +4,11 @@
 // no base URL, so external/relative image sources cannot be relied upon — every
 // logo here is inline (data URL / inline SVG) and renders without any network request.
 //
-// TCS = official tcslogo.png (Couriers/tcsformat) embedded as a data URL.
+// TCS = official logo, source file tracked at src/client/assets/couriers/tcslogo.png
+//       (also public/tcslogo.png), embedded below as a base64 data URL. The data URL
+//       is what actually renders — the print window has no base URL so a served file
+//       path cannot be relied on. To refresh after replacing the PNG, re-embed with
+//       `base64 -w0 tcslogo.png`.
 // PostEx = brand-approximate SVG wordmark (matches the "PostEx." reference labels).
 
 const esc = (s) => String(s == null ? '' : s)
