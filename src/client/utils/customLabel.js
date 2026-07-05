@@ -343,16 +343,18 @@ function invoiceBlock(b, settings, assets) {
 
 // ── format metadata: page size, pagination, and which renderer(s) to use ─────
 const FORMATS = {
-  // margin = minimum only (print hugs the top-left corner, not centered).
-  'A4-3':            { kind: 'label3',       page: '@page{size:A4;margin:3mm}',      brk: '.item:nth-of-type(3n){page-break-after:always}' },
-  'A4-4':            { kind: 'label3',       page: '@page{size:A4;margin:3mm}',      brk: '.item:nth-of-type(4n){page-break-after:always}', compact: true },
-  '8X4':             { kind: 'label3',       page: '@page{size:8in 4in;margin:2mm}', brk: '.item{page-break-after:always}', compact: true },
-  'THERMAL-6X3':     { kind: 'thermalLandscape', page: '@page{size:6in 3in;margin:1mm}', brk: '.item{page-break-after:always}' },
-  'THERMAL-6X4':     { kind: 'thermalLandscape', page: '@page{size:6in 4in;margin:1mm}', brk: '.item{page-break-after:always}' },
-  'THERMAL-4X6':     { kind: 'thermal',      page: '@page{size:4in 6in;margin:1mm}', brk: '.item{page-break-after:always}' },
-  'THERMAL-3X4':     { kind: 'thermal',      page: '@page{size:3in 4in;margin:1mm}', brk: '.item{page-break-after:always}' },
-  'A4-LABEL-INVOICE':{ kind: 'labelInvoice', page: '@page{size:A4;margin:3mm}',      brk: '.item{page-break-after:always}' },
-  'A4-INVOICE':      { kind: 'invoice',      page: '@page{size:A4;margin:3mm}',      brk: '.item{page-break-after:always}' },
+  // margin:0 => print hugs the top-left corner AND suppresses the browser's auto
+  // page header/footer (title, date, URL, page number). Content spacing is handled
+  // inside each label instead.
+  'A4-3':            { kind: 'label3',       page: '@page{size:A4;margin:0}',      brk: '.item:nth-of-type(3n){page-break-after:always}' },
+  'A4-4':            { kind: 'label3',       page: '@page{size:A4;margin:0}',      brk: '.item:nth-of-type(4n){page-break-after:always}', compact: true },
+  '8X4':             { kind: 'label3',       page: '@page{size:8in 4in;margin:0}', brk: '.item{page-break-after:always}', compact: true },
+  'THERMAL-6X3':     { kind: 'thermalLandscape', page: '@page{size:6in 3in;margin:0}', brk: '.item{page-break-after:always}' },
+  'THERMAL-6X4':     { kind: 'thermalLandscape', page: '@page{size:6in 4in;margin:0}', brk: '.item{page-break-after:always}' },
+  'THERMAL-4X6':     { kind: 'thermal',      page: '@page{size:4in 6in;margin:0}', brk: '.item{page-break-after:always}' },
+  'THERMAL-3X4':     { kind: 'thermal',      page: '@page{size:3in 4in;margin:0}', brk: '.item{page-break-after:always}' },
+  'A4-LABEL-INVOICE':{ kind: 'labelInvoice', page: '@page{size:A4;margin:0}',      brk: '.item{page-break-after:always}' },
+  'A4-INVOICE':      { kind: 'invoice',      page: '@page{size:A4;margin:0}',      brk: '.item{page-break-after:always}' },
 };
 
 function renderOne(kind, b, settings, assets, fmt) {
