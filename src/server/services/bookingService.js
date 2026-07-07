@@ -149,6 +149,27 @@ async function getActiveBookingsForTracking(shop) {
 }
 
 /**
+ * Loads specific TCS bookings by their tracking numbers (for on-demand tracking
+ * of a user-selected set — includes already-terminal ones so a manual refresh works).
+ */
+async function getBookingsByTrackingNumbers(shop, cns) {
+  const list = (Array.isArray(cns) ? cns : [cns]).map(c => String(c || '').trim()).filter(Boolean);
+  if (list.length === 0) return [];
+  try {
+    const result = await db.query(
+      `SELECT id, order_id, tracking_number, status, last_shopify_event, fulfillment_id
+         FROM bookings
+        WHERE shop_domain = $1 AND courier = 'TCS' AND tracking_number = ANY($2)`,
+      [shop, list]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error loading bookings by tracking numbers:', error.message);
+    return [];
+  }
+}
+
+/**
  * Distinct shop domains that have at least one active TCS booking to track.
  */
 async function getShopsWithActiveBookings() {
@@ -204,6 +225,7 @@ module.exports = {
   findBookingByTrackingForLoadsheet,
   findBookingByTrackingForReturn,
   getActiveBookingsForTracking,
+  getBookingsByTrackingNumbers,
   getShopsWithActiveBookings,
   updateTrackingStatus,
   TERMINAL,

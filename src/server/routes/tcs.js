@@ -249,12 +249,17 @@ router.get('/print-label', async (req, res) => {
 // Optional: GET /api/tcs/track/:cn  → raw tracking for one/comma-separated CN(s)
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/track', async (req, res) => {
-  const { shop } = req.body;
+  const { shop, cns } = req.body;
   if (!shop) {
     return res.status(400).json({ success: false, error: 'shop is required.', code: 'MISSING_FIELDS' });
   }
   try {
-    const summary = await trackingService.pollShopTracking(shop);
+    // `cns` (optional): track only these consignment numbers (Track button on selected
+    // rows). Without it, tracks every active booking for the shop (same as the poller).
+    const list = Array.isArray(cns)
+      ? cns.map(c => String(c || '').trim()).filter(Boolean)
+      : (cns ? String(cns).split(',').map(s => s.trim()).filter(Boolean) : null);
+    const summary = await trackingService.pollShopTracking(shop, list && list.length ? { cns: list } : {});
     res.json({ success: true, ...summary });
   } catch (e) {
     sendError(res, e, 500);

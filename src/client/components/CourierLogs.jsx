@@ -91,6 +91,65 @@ const styles = {
   }
 };
 
+// Color-code a courier status by lifecycle stage (shared by badge + modal).
+function statusColor(status) {
+  const s = (status || '').toLowerCase();
+  if (/delivered/.test(s))              return { bg: 'rgba(16,185,129,0.12)', fg: '#10b981' };
+  if (/return to shipper|rts|failed|failure|refused|returned|cancel/.test(s)) return { bg: 'rgba(239,68,68,0.12)', fg: '#ef4444' };
+  if (/out for delivery/.test(s))       return { bg: 'rgba(245,158,11,0.14)', fg: '#f59e0b' };
+  if (/transit|arrived|facility|received|departed|pickup|collection|shipped|assigned|loadsheet/.test(s)) return { bg: 'rgba(59,130,246,0.10)', fg: '#3b82f6' };
+  return { bg: 'rgba(100,116,139,0.12)', fg: '#64748b' };
+}
+
+// Results modal shown after pressing Track: per-order derived status + timeline.
+function TrackResultsModal({ results, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)', borderRadius: '14px', maxWidth: '620px', width: '100%', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--surface, #fff)' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>Tracking results ({results.length})</h3>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '22px', cursor: 'pointer', color: 'var(--muted, #64748b)', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '16px 24px' }}>
+          {results.length === 0 && <p style={{ color: 'var(--muted, #64748b)' }}>No results returned.</p>}
+          {results.map((r, idx) => {
+            const c = statusColor(r.status);
+            const timeline = (r.detail && (r.detail.checkpoints?.length ? r.detail.checkpoints : r.detail.deliveryinfo)) || [];
+            return (
+              <div key={r.cn + idx} style={{ padding: '14px 0', borderBottom: idx === results.length - 1 ? 'none' : '1px solid var(--border, #e2e8f0)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div>
+                    <span style={{ fontWeight: 700 }}>{r.orderId}</span>
+                    <span style={{ fontFamily: 'monospace', color: '#2563eb', marginLeft: '10px', fontSize: '13px' }}>{r.cn}</span>
+                  </div>
+                  <span style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, background: c.bg, color: c.fg }}>
+                    {r.notFound || !r.found ? 'No info yet' : r.status}
+                  </span>
+                </div>
+                {timeline.length > 0 && (
+                  <div style={{ marginTop: '10px', paddingLeft: '4px' }}>
+                    {timeline.slice(0, 6).map((cp, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '12px', paddingBottom: '10px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: i === 0 ? c.fg : '#cbd5e1', marginTop: '4px', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600 }}>{cp.status}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--muted, #64748b)' }}>
+                            {cp.datetime}{cp.recievedby ? ` · ${cp.recievedby}` : ''}{cp.station ? ` · ${cp.station}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CourierLogs({ shop, courierFilter }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -108,16 +167,21 @@ export default function CourierLogs({ shop, courierFilter }) {
   // Sorting
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
 
+  // Tracking
+  const [tracking, setTracking] = useState(false);
+  const [trackResults, setTrackResults] = useState(null); // array or null (modal closed)
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(`/api/bookings?shop=${shop}`);
+      const data = await resp.json();
+      if (data.success) setBookings(data.bookings);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      try {
-        const resp = await fetch(`/api/bookings?shop=${shop}`);
-        const data = await resp.json();
-        if (data.success) setBookings(data.bookings);
-      } catch (e) { console.error(e); }
-      setLoading(false);
-    };
     fetchLogs();
   }, [shop]);
 
@@ -224,6 +288,43 @@ export default function CourierLogs({ shop, courierFilter }) {
     }
   };
 
+  // Track selected orders: hits the backend, which fetches live TCS status,
+  // updates the DB + Shopify, then we refresh the list and show a results modal.
+  const handleTrack = async () => {
+    const selected = filteredLogs.filter(b => selectedIds.has(b.id));
+    const tcsCns = selected.filter(b => b.courier === 'TCS').map(b => b.tracking_number).filter(Boolean);
+
+    if (selected.length === 0) {
+      alert('Please select at least one order to track.');
+      return;
+    }
+    if (tcsCns.length === 0) {
+      alert('Tracking is only available for TCS shipments right now. Please select TCS orders.');
+      return;
+    }
+
+    setTracking(true);
+    try {
+      const resp = await fetch('/api/tcs/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop, cns: tcsCns }),
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        alert('Tracking failed: ' + (data.error || 'Unknown error'));
+        return;
+      }
+      await fetchLogs();               // refresh statuses in the table
+      setTrackResults(data.results || []); // open the results modal
+    } catch (e) {
+      console.error(e);
+      alert('Failed to track: ' + e.message);
+    } finally {
+      setTracking(false);
+    }
+  };
+
   const SortIcon = ({ col }) => {
     if (sortConfig.key !== col) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>;
     return <span style={{ marginLeft: '4px', color: '#3b82f6' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
@@ -301,7 +402,13 @@ export default function CourierLogs({ shop, courierFilter }) {
           <button style={{ ...styles.btn(), height: '42px', borderColor: '#8b5cf6', color: '#8b5cf6' }} onClick={handleCustomPrint}>
             Custom Label
           </button>
-          <button style={{ ...styles.btn('secondary'), height: '42px', border: '1px solid #3b82f6', color: '#3b82f6' }}>Track</button>
+          <button
+            style={{ ...styles.btn('secondary'), height: '42px', border: '1px solid #3b82f6', color: '#3b82f6', opacity: tracking ? 0.6 : 1, cursor: tracking ? 'wait' : 'pointer' }}
+            onClick={handleTrack}
+            disabled={tracking}
+          >
+            {tracking ? 'Tracking…' : `Track${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+          </button>
           
           <div style={{ position: 'relative' }}>
             <button 
@@ -400,9 +507,11 @@ export default function CourierLogs({ shop, courierFilter }) {
                   {b.traceid ? b.traceid.slice(0, 8) + '…' : '-'}
                 </td>
                 <td style={styles.td}>
-                  <span style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '800', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', textTransform: 'uppercase' }}>
-                    {b.status}
-                  </span>
+                  {(() => { const c = statusColor(b.status); return (
+                    <span style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '800', background: c.bg, color: c.fg, textTransform: 'uppercase' }}>
+                      {b.status}
+                    </span>
+                  ); })()}
                 </td>
               </tr>
             ))}
@@ -416,6 +525,10 @@ export default function CourierLogs({ shop, courierFilter }) {
           </tbody>
         </table>
       </div>
+
+      {trackResults && (
+        <TrackResultsModal results={trackResults} onClose={() => setTrackResults(null)} />
+      )}
     </div>
   );
 }

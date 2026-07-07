@@ -9,14 +9,21 @@ const shopifyService = require('./shopifyService');
 let isRunning = false;
 
 /**
- * Tracks all active bookings for a single shop and syncs changes to Shopify.
- * @returns {Promise<{shop, checked, updated, terminal, errors}>}
+ * Tracks bookings for a single shop and syncs changes to Shopify.
+ * @param {string} shop
+ * @param {object} [opts]
+ * @param {string[]} [opts.cns] Limit to these consignment numbers (on-demand Track
+ *        button). When omitted, tracks all active (non-terminal) bookings (poller).
+ * @returns {Promise<{shop, checked, updated, terminal, errors, results}>}
+ *   `results` is a per-CN array for the UI: { cn, orderId, status, code, statusDateTime, isTerminal, found, notFound, detail }.
  */
-async function pollShopTracking(shop) {
-  const summary = { shop, checked: 0, updated: 0, terminal: 0, errors: 0 };
+async function pollShopTracking(shop, opts = {}) {
+  const summary = { shop, checked: 0, updated: 0, terminal: 0, errors: 0, results: [] };
   if (!shop) return summary;
 
-  const bookings = await bookingService.getActiveBookingsForTracking(shop);
+  const bookings = (opts.cns && opts.cns.length)
+    ? await bookingService.getBookingsByTrackingNumbers(shop, opts.cns)
+    : await bookingService.getActiveBookingsForTracking(shop);
   if (bookings.length === 0) return summary;
 
   // Map CN → booking row (a CN is unique per shipment).
@@ -40,26 +47,34 @@ async function pollShopTracking(shop) {
   for (const [cn, perCn] of tracked) {
     const booking = byCn.get(cn);
     if (!booking) continue;
-    if (perCn.notFound) continue; // nothing to update yet
+    if (perCn.notFound) {
+      // No tracking data yet — report it so the UI can show "no info yet".
+      summary.results.push({ cn, orderId: booking.order_id, status: booking.status, found: false, notFound: true, detail: null });
+      continue;
+    }
 
     try {
       const derived = tcsService.deriveStatus(perCn);
+      const detail = {
+        shipmentinfo:    perCn.shipmentinfo || null,
+        deliveryinfo:    perCn.deliveryinfo || [],
+        checkpoints:     perCn.checkpoints || [],
+        shipmentsummary: perCn.shipmentsummary || null,
+      };
+      summary.results.push({
+        cn, orderId: booking.order_id,
+        status: derived.status, code: derived.code, statusDateTime: derived.statusDateTime,
+        isTerminal: derived.isTerminal, found: derived.found, detail,
+      });
       if (!derived.found) continue;
 
       const statusChanged = derived.status && derived.status !== booking.status;
 
       // Persist the derived status + full cached timeline (used by the UI modal).
-      const trackingDetail = JSON.stringify({
-        shipmentinfo:    perCn.shipmentinfo || null,
-        deliveryinfo:    perCn.deliveryinfo || [],
-        checkpoints:     perCn.checkpoints || [],
-        shipmentsummary: perCn.shipmentsummary || null,
-      });
-
       await bookingService.updateTrackingStatus(booking.id, {
         status:         derived.status,
         statusCode:     derived.code,
-        trackingDetail,
+        trackingDetail: JSON.stringify(detail),
         lastTrackedAt:  new Date(),
         deliveredAt:    derived.isDelivered ? (tcsService.parseTrackDate(derived.statusDateTime) || new Date()) : null,
       });
