@@ -120,11 +120,91 @@ async function findBookingByTrackingForReturn(shop, courier, trackingOrOrder) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Tracking helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Terminal statuses: once a shipment reaches these we stop tracking/pushing.
+const TERMINAL = ['Delivered', 'Return to Shipper'];
+
+/**
+ * Active TCS bookings for a shop that still need tracking (non-terminal, recent).
+ */
+async function getActiveBookingsForTracking(shop) {
+  try {
+    const result = await db.query(
+      `SELECT id, order_id, tracking_number, status, last_shopify_event, fulfillment_id
+         FROM bookings
+        WHERE shop_domain = $1
+          AND courier = 'TCS'
+          AND (status IS NULL OR status NOT IN ('Delivered', 'Return to Shipper'))
+          AND created_at > NOW() - INTERVAL '60 days'`,
+      [shop]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error loading active bookings for tracking:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Distinct shop domains that have at least one active TCS booking to track.
+ */
+async function getShopsWithActiveBookings() {
+  try {
+    const result = await db.query(
+      `SELECT DISTINCT shop_domain
+         FROM bookings
+        WHERE courier = 'TCS'
+          AND (status IS NULL OR status NOT IN ('Delivered', 'Return to Shipper'))
+          AND created_at > NOW() - INTERVAL '60 days'`
+    );
+    return result.rows.map(r => r.shop_domain);
+  } catch (error) {
+    console.error('Error loading shops with active bookings:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Updates a booking's tracking fields. Only provided fields are written (COALESCE).
+ */
+async function updateTrackingStatus(id, { status, statusCode, trackingDetail, lastTrackedAt, deliveredAt, lastShopifyEvent } = {}) {
+  try {
+    await db.query(
+      `UPDATE bookings SET
+         status             = COALESCE($2, status),
+         status_code        = COALESCE($3, status_code),
+         tracking_detail    = COALESCE($4, tracking_detail),
+         last_tracked_at    = COALESCE($5, last_tracked_at),
+         delivered_at       = COALESCE($6, delivered_at),
+         last_shopify_event = COALESCE($7, last_shopify_event)
+       WHERE id = $1`,
+      [
+        id,
+        status || null,
+        statusCode || null,
+        trackingDetail || null,
+        lastTrackedAt || null,
+        deliveredAt || null,
+        lastShopifyEvent || null,
+      ]
+    );
+  } catch (error) {
+    console.error(`Error updating tracking status for booking ${id}:`, error.message);
+  }
+}
+
 module.exports = {
   getAllBookings,
   saveBooking,
   isOrderBooked,
   deleteBooking,
   findBookingByTrackingForLoadsheet,
-  findBookingByTrackingForReturn
+  findBookingByTrackingForReturn,
+  getActiveBookingsForTracking,
+  getShopsWithActiveBookings,
+  updateTrackingStatus,
+  TERMINAL,
 };

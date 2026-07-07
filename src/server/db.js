@@ -80,6 +80,14 @@ const initDB = async () => {
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pieces INTEGER DEFAULT 1;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remarks TEXT;
     ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_type VARCHAR(50);
+
+    -- Tracking lifecycle: derived courier status + cached timeline + Shopify sync bookkeeping.
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS status_code VARCHAR(20);
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tracking_detail TEXT;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS last_tracked_at TIMESTAMPTZ;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS last_shopify_event VARCHAR(50);
+    ALTER TABLE bookings ADD COLUMN IF NOT EXISTS fulfillment_id VARCHAR(100);
   `;
 
   // ── Per-shop settings: custom label logo + brand/shipper profile ────────────

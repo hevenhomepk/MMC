@@ -47,6 +47,16 @@ const styles = {
     color: '#3b82f6',
     border: '1px solid rgba(59,130,246,0.2)'
   },
+  linkBtn: {
+    padding: '4px 10px',
+    borderRadius: '6px',
+    border: '1px solid var(--border, #e2e8f0)',
+    background: 'transparent',
+    color: 'var(--text, #0f172a)',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
   btnPrimary: {
     padding: '10px 20px',
     borderRadius: '8px',
@@ -59,10 +69,92 @@ const styles = {
   }
 };
 
+// Color-code the courier status badge by lifecycle stage.
+function statusColor(status) {
+  const s = (status || '').toLowerCase();
+  if (/delivered/.test(s))              return { bg: 'rgba(16,185,129,0.12)', fg: '#10b981', bd: 'rgba(16,185,129,0.25)' }; // green
+  if (/return to shipper|failed|failure/.test(s)) return { bg: 'rgba(239,68,68,0.12)', fg: '#ef4444', bd: 'rgba(239,68,68,0.25)' }; // red
+  if (/out for delivery/.test(s))       return { bg: 'rgba(245,158,11,0.14)', fg: '#f59e0b', bd: 'rgba(245,158,11,0.28)' }; // amber
+  if (/transit|arrived|facility|received|departed|pickup|collection/.test(s)) return { bg: 'rgba(59,130,246,0.10)', fg: '#3b82f6', bd: 'rgba(59,130,246,0.2)' }; // blue
+  return { bg: 'rgba(100,116,139,0.12)', fg: '#64748b', bd: 'rgba(100,116,139,0.22)' }; // slate (Booked/unknown)
+}
+
+function StatusBadge({ status }) {
+  const c = statusColor(status);
+  return (
+    <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.bd}` }}>
+      {status || 'Booked'}
+    </span>
+  );
+}
+
+// Read-only timeline modal. Renders the cached tracking_detail (populated by the
+// background poller); it never triggers a live TCS call.
+function TrackingModal({ booking, onClose }) {
+  let detail = null;
+  try { detail = booking.tracking_detail ? JSON.parse(booking.tracking_detail) : null; } catch { detail = null; }
+  const checkpoints = (detail && detail.checkpoints) || [];
+  const delivery    = (detail && detail.deliveryinfo) || [];
+  const info        = detail && detail.shipmentinfo;
+  // Prefer the richer checkpoint list; fall back to delivery entries.
+  const timeline = checkpoints.length ? checkpoints : delivery;
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)', borderRadius: '14px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>Tracking · {booking.tracking_number}</h3>
+            <div style={{ marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <StatusBadge status={booking.status} />
+              {booking.last_tracked_at && (
+                <span style={{ fontSize: '12px', color: 'var(--muted, #64748b)' }}>
+                  Updated {new Date(booking.last_tracked_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '22px', cursor: 'pointer', color: 'var(--muted, #64748b)', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '20px 24px' }}>
+          {info && (
+            <div style={{ fontSize: '13px', color: 'var(--muted, #64748b)', marginBottom: '16px' }}>
+              {info.origin} → {info.destination}{info.bookingdate ? ` · Booked ${info.bookingdate}` : ''}
+            </div>
+          )}
+          {timeline.length === 0 ? (
+            <p style={{ color: 'var(--muted, #64748b)', fontSize: '14px' }}>
+              No tracking checkpoints yet. Status refreshes automatically.
+            </p>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              {timeline.map((cp, i) => (
+                <div key={i} style={{ display: 'flex', gap: '14px', paddingBottom: i === timeline.length - 1 ? 0 : '18px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: i === 0 ? statusColor(booking.status).fg : '#cbd5e1', marginTop: '3px', flexShrink: 0 }} />
+                    {i !== timeline.length - 1 && <div style={{ width: '2px', flex: 1, background: 'var(--border, #e2e8f0)', marginTop: '2px' }} />}
+                  </div>
+                  <div style={{ paddingBottom: '2px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600 }}>{cp.status}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted, #64748b)' }}>
+                      {cp.datetime}{cp.recievedby ? ` · ${cp.recievedby}` : ''}{cp.station ? ` · ${cp.station}` : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BookingList({ shop }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [trackingBooking, setTrackingBooking] = useState(null);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -130,6 +222,7 @@ export default function BookingList({ shop }) {
               <th style={styles.th}>COD Amount</th>
               <th style={styles.th}>Status</th>
               <th style={styles.th}>Date</th>
+              <th style={styles.th}>Tracking</th>
             </tr>
           </thead>
           <tbody>
@@ -144,15 +237,22 @@ export default function BookingList({ shop }) {
                 <td style={styles.td}>{b.consignee_city}</td>
                 <td style={{ ...styles.td, fontWeight: '700' }}>Rs {parseFloat(b.cod_amount).toLocaleString()}</td>
                 <td style={styles.td}>
-                  <span style={styles.statusBadge}>{b.status}</span>
+                  <StatusBadge status={b.status} />
                 </td>
                 <td style={{ ...styles.td, color: 'var(--muted)', fontSize: '12px' }}>
                   {new Date(b.created_at).toLocaleDateString()}
+                </td>
+                <td style={styles.td}>
+                  <button style={styles.linkBtn} onClick={() => setTrackingBooking(b)}>Details</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {trackingBooking && (
+        <TrackingModal booking={trackingBooking} onClose={() => setTrackingBooking(null)} />
       )}
     </div>
   );

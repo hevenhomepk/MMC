@@ -892,7 +892,20 @@ async function bookShipment(payload) {
     if (account.auto_fulfillment) {
       try {
         fulfillment = await shopifyService.fulfillOrder(shop, bookingDetails.orderId, consignmentNo, 'TCS');
-        if (!fulfillment.success) {
+        if (fulfillment.success) {
+          // Capture the fulfillment id so the tracking poller can post events to it.
+          const fid = fulfillment.data?.fulfillment?.id;
+          if (fid) {
+            try {
+              await db.query(
+                'UPDATE bookings SET fulfillment_id = $1 WHERE shop_domain = $2 AND order_id = $3 AND tracking_number = $4',
+                [String(fid), shop, bookingDetails.orderId, consignmentNo]
+              );
+            } catch (e) {
+              console.warn('[TCS Booking] Could not store fulfillment_id (non-fatal):', e.message);
+            }
+          }
+        } else {
           console.error('[TCS Booking] Shopify fulfillment failed (booking still saved):', fulfillment.error);
         }
       } catch (err) {
@@ -1009,6 +1022,229 @@ async function printLabel({ shop, consignmentNos, printType = 3, shipperDetails 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tracking (TCS GetDynamicTrackDetail API)
+// GET {host}/tracking/api/Tracking/GetDynamicTrackDetail?consignee=CN1&consignee=CN2
+// Auth: same gateway token as the ecom API (its role array includes "Track").
+// Note: it's a GET whose `consignee` array binds from the *query string* (repeated
+// param). POST → 405, and a JSON body on the GET is ignored. Verified live.
+// ─────────────────────────────────────────────────────────────────────────────
+const TCS_TRACKING_ENDPOINTS = [
+  'https://devconnect.tcscourier.com/tracking/api/Tracking/GetDynamicTrackDetail', // sandbox/UAT
+  'https://ociconnect.tcscourier.com/tracking/api/Tracking/GetDynamicTrackDetail', // production
+];
+
+// TCS accepts up to 20 consignment numbers per tracking request.
+const TRACK_BATCH_SIZE = 20;
+
+// Terminal statuses — once reached, we stop polling and stop pushing to Shopify.
+const TERMINAL_STATUSES = ['Delivered', 'Return to Shipper'];
+
+/**
+ * Parse a TCS tracking datetime like "Thursday Oct 17, 2024 12:58" or
+ * "Monday    Oct 14, 2024 23:19" (leading weekday word + irregular spaces).
+ * Returns a Date, or null if unparseable.
+ */
+function parseTrackDate(str) {
+  if (!str || typeof str !== 'string') return null;
+  // Drop the leading weekday word and collapse whitespace → "Oct 17, 2024 12:58"
+  const cleaned = str.trim().replace(/^\S+\s+/, '').replace(/\s+/g, ' ').trim();
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) return d;
+  // Fallback: try the raw string as-is
+  const d2 = new Date(str);
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
+/**
+ * Groups a raw tracking response's arrays by consignmentno.
+ * @returns {Map<string, {shipmentinfo, deliveryinfo[], checkpoints[], shipmentsummary}>}
+ */
+function groupTrackingByCn(data) {
+  const map = new Map();
+  const ensure = (cn) => {
+    if (!map.has(cn)) {
+      map.set(cn, { shipmentinfo: null, deliveryinfo: [], checkpoints: [], shipmentsummary: null });
+    }
+    return map.get(cn);
+  };
+  (data?.shipmentinfo || []).forEach(row => {
+    const cn = String(row.consignmentno || '').trim();
+    if (cn) ensure(cn).shipmentinfo = row;
+  });
+  (data?.deliveryinfo || []).forEach(row => {
+    const cn = String(row.consignmentno || '').trim();
+    if (cn) ensure(cn).deliveryinfo.push(row);
+  });
+  (data?.checkpoints || []).forEach(row => {
+    const cn = String(row.consignmentno || '').trim();
+    if (cn) ensure(cn).checkpoints.push(row);
+  });
+  return map;
+}
+
+/**
+ * True when a grouped per-CN record actually contains tracking data (not the
+ * "No Data Found/Invalid CN" empty shape that sandbox returns for prod CNs).
+ */
+function hasTrackingData(perCn) {
+  return !!(perCn && (perCn.shipmentinfo ||
+    (perCn.deliveryinfo && perCn.deliveryinfo.length) ||
+    (perCn.checkpoints && perCn.checkpoints.length)));
+}
+
+/**
+ * Calls the tracking endpoint(s) for up to 20 CNs and returns a
+ * Map<cn, {shipmentinfo, deliveryinfo[], checkpoints[], shipmentsummary}>.
+ * Tries each environment in order; a CN is only considered "found" when the
+ * response carries real data — otherwise we fall through to the next host
+ * (sandbox returns SUCCESS-with-nulls for CNs it doesn't have).
+ */
+async function trackChunk(cns, { timezone = true } = {}) {
+  const result = new Map();
+  let lastErr = null;
+
+  for (const url of TCS_TRACKING_ENDPOINTS) {
+    // Skip environments whose gateway token isn't configured (e.g. prod token empty).
+    const gwToken = getGatewayToken(url);
+    if (!gwToken) continue;
+
+    try {
+      const res = await axios.get(url, {
+        params: { consignee: cns, Timezone: !!timezone },
+        // axios default array serialization emits consignee=A&consignee=B (repeat),
+        // which is what the ASP.NET array binder expects.
+        paramsSerializer: {
+          serialize: (params) => {
+            const parts = [];
+            for (const cn of params.consignee) parts.push(`consignee=${encodeURIComponent(cn)}`);
+            parts.push(`Timezone=${params.Timezone}`);
+            return parts.join('&');
+          },
+        },
+        headers: { 'Authorization': `Bearer ${gwToken}`, 'Accept': 'application/json' },
+        timeout: 20000,
+      });
+
+      const grouped = groupTrackingByCn(res.data);
+      let foundAny = false;
+      for (const cn of cns) {
+        const perCn = grouped.get(cn);
+        if (hasTrackingData(perCn) && !result.has(cn)) {
+          result.set(cn, perCn);
+          foundAny = true;
+        }
+      }
+      // If this environment resolved every requested CN, no need to try the next.
+      if (result.size === cns.length) break;
+      if (!foundAny) {
+        console.log(`[TCS Track] ${url} returned no data for ${cns.length} CN(s); trying next environment.`);
+      }
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[TCS Track] Tracking call failed on ${url}:`, e.response?.status || '', e.message);
+    }
+  }
+
+  // Fill in CNs that never resolved with an empty record so callers see them.
+  for (const cn of cns) {
+    if (!result.has(cn)) {
+      result.set(cn, { shipmentinfo: null, deliveryinfo: [], checkpoints: [], shipmentsummary: 'No Data Found/Invalid CN', notFound: true });
+    }
+  }
+  if (result.size === 0 && lastErr) throw lastErr;
+  return result;
+}
+
+/**
+ * Public: track any number of consignment numbers (auto-batched into ≤20 groups).
+ * @param {string[]} cns
+ * @returns {Promise<Map<string, object>>}
+ */
+async function trackConsignments(cns, opts = {}) {
+  const list = (Array.isArray(cns) ? cns : [cns])
+    .map(c => (c == null ? '' : String(c).trim()))
+    .filter(Boolean);
+  const unique = [...new Set(list)];
+
+  const merged = new Map();
+  for (let i = 0; i < unique.length; i += TRACK_BATCH_SIZE) {
+    const chunk = unique.slice(i, i + TRACK_BATCH_SIZE);
+    const partial = await trackChunk(chunk, opts);
+    for (const [cn, val] of partial) merged.set(cn, val);
+  }
+  return merged;
+}
+
+/**
+ * Derives the current status for one grouped-per-CN record.
+ * Prefers deliveryinfo (latest by datetime); falls back to the latest checkpoint.
+ * @returns {{ status, code, statusDateTime, isTerminal, isDelivered, isRTS, found }}
+ */
+function deriveStatus(perCn) {
+  const pickLatest = (rows) => {
+    if (!rows || rows.length === 0) return null;
+    return rows.reduce((latest, row) => {
+      const rd = parseTrackDate(row.datetime);
+      const ld = latest ? parseTrackDate(latest.datetime) : null;
+      if (!ld) return row;
+      if (rd && rd.getTime() > ld.getTime()) return row;
+      return latest;
+    }, null) || rows[0];
+  };
+
+  let status = null, code = null, statusDateTime = null;
+
+  const delivery = pickLatest(perCn?.deliveryinfo);
+  if (delivery) {
+    status = delivery.status || null;
+    code = delivery.code || null;
+    statusDateTime = delivery.datetime || null;
+  } else {
+    const checkpoint = pickLatest(perCn?.checkpoints);
+    if (checkpoint) {
+      status = checkpoint.status || null;
+      statusDateTime = checkpoint.datetime || null;
+    }
+  }
+
+  const norm = (status || '').trim();
+  const isDelivered = /^delivered$/i.test(norm) || /shipment delivered/i.test(norm) || (code && code.toUpperCase() === 'OK');
+  const isRTS = /return to shipper/i.test(norm);
+  // Canonicalise the two terminal states so DB/UI/filters compare consistently.
+  let canonical = norm || null;
+  if (isDelivered) canonical = 'Delivered';
+  else if (isRTS) canonical = 'Return to Shipper';
+
+  return {
+    status: canonical,
+    code,
+    statusDateTime,
+    isTerminal: isDelivered || isRTS,
+    isDelivered,
+    isRTS,
+    found: !!norm,
+  };
+}
+
+/**
+ * Maps a TCS status/code to a Shopify fulfillment-event status.
+ * Shopify enum: label_printed, label_purchased, attempted_delivery, ready_for_pickup,
+ * confirmed, in_transit, out_for_delivery, delivered, failure.
+ */
+function normalizeStatusToShopifyEvent(status, code) {
+  const s = (status || '').trim().toLowerCase();
+  const c = (code || '').trim().toUpperCase();
+  if (c === 'OK' || /delivered/.test(s)) return 'delivered';
+  if (/return to shipper/.test(s)) return 'failure';
+  if (/out for delivery/.test(s)) return 'out_for_delivery';
+  if (/awaiting receiver collection|ready for pickup|hold/.test(s) || c === 'SC') return 'ready_for_pickup';
+  if (/attempt|undeliver|not available|no response|refused/.test(s)) return 'attempted_delivery';
+  if (/arrived|departed|in transit|facility|received|picked/.test(s)) return 'in_transit';
+  if (/booked|created/.test(s)) return 'confirmed';
+  return 'in_transit';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 module.exports = {
@@ -1025,4 +1261,9 @@ module.exports = {
   bookShipment,
   fetchLoadsheets,
   printLabel,
+  trackConsignments,
+  deriveStatus,
+  normalizeStatusToShopifyEvent,
+  parseTrackDate,
+  TERMINAL_STATUSES,
 };

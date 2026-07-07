@@ -35,9 +35,15 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
+const server = app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  // Start the TCS tracking poller (re-checks shipments, syncs status to Shopify).
+  try {
+    require('./services/trackingService').startPoller();
+  } catch (e) {
+    console.error('[Tracking] Failed to start poller (non-fatal):', e.message);
+  }
+});
 
 // ── Graceful error handling ──────────────────────────────────────────────────
 server.on('error', (err) => {

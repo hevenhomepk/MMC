@@ -258,7 +258,109 @@ async function fulfillOrder(shop, orderName, trackingNum, courierName) {
   }
 }
 
+/**
+ * Resolves a Shopify order by its name (e.g. "#1002"). Returns the order object or null.
+ */
+async function findOrderByName(shop, orderName, accessToken) {
+  const res = await axios.get(
+    `https://${shop}/admin/api/2025-01/orders.json`,
+    {
+      params: { name: orderName, status: 'any', limit: 1 },
+      headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+    }
+  );
+  const orders = res.data?.orders || [];
+  return orders.length > 0 ? orders[0] : null;
+}
+
+/**
+ * Pushes a courier status to Shopify: posts a fulfillment event (buyer-facing
+ * tracking timeline) and adds an order tag (merchant admin filtering).
+ * Never throws — the tracking poller must stay alive. Returns a result summary.
+ *
+ * @param {string} shop
+ * @param {string} orderName       Shopify order name, e.g. "#1002"
+ * @param {object} opts
+ * @param {string} opts.eventStatus   Shopify fulfillment-event status (in_transit, delivered, ...)
+ * @param {string} [opts.tag]         Order tag to add (e.g. "Delivered")
+ * @param {string} [opts.fulfillmentId] Known fulfillment id (avoids a lookup)
+ */
+async function updateOrderStatus(shop, orderName, { eventStatus, tag, fulfillmentId } = {}) {
+  const outcome = { success: false, eventPosted: false, tagAdded: false };
+  try {
+    if (!shop || !orderName) return { ...outcome, error: 'Missing shop or orderName' };
+
+    const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    if (!accessToken) return { ...outcome, error: 'No access token' };
+
+    const order = await findOrderByName(shop, orderName, accessToken);
+    if (!order) return { ...outcome, error: `Order ${orderName} not found` };
+    const orderId = order.id;
+
+    const headers = { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' };
+
+    // ── 1. Fulfillment event (buyer-facing) ─────────────────────────────────────
+    if (eventStatus) {
+      try {
+        let fid = fulfillmentId;
+        if (!fid) {
+          const fRes = await axios.get(
+            `https://${shop}/admin/api/2025-01/orders/${orderId}/fulfillments.json`,
+            { headers }
+          );
+          const fulfillments = fRes.data?.fulfillments || [];
+          if (fulfillments.length > 0) fid = fulfillments[fulfillments.length - 1].id;
+        }
+        if (fid) {
+          await axios.post(
+            `https://${shop}/admin/api/2025-01/fulfillments/${fid}/events.json`,
+            { event: { status: eventStatus } },
+            { headers }
+          );
+          outcome.eventPosted = true;
+          outcome.fulfillmentId = fid;
+        } else {
+          // No fulfillment exists (e.g. auto_fulfillment was off) — event is not possible.
+          outcome.eventSkipped = 'no fulfillment on order';
+        }
+      } catch (e) {
+        console.warn(`[shopifyService] Fulfillment event (${eventStatus}) failed for ${orderName}:`, e.response?.status || '', JSON.stringify(e.response?.data?.errors || e.message));
+        outcome.eventError = e.response?.data?.errors || e.message;
+      }
+    }
+
+    // ── 2. Order tag (merchant-facing) ──────────────────────────────────────────
+    if (tag) {
+      try {
+        const existing = (order.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        if (!existing.some(t => t.toLowerCase() === tag.toLowerCase())) {
+          existing.push(tag);
+          await axios.put(
+            `https://${shop}/admin/api/2025-01/orders/${orderId}.json`,
+            { order: { id: orderId, tags: existing.join(', ') } },
+            { headers }
+          );
+          outcome.tagAdded = true;
+        } else {
+          outcome.tagAdded = false;
+          outcome.tagExisted = true;
+        }
+      } catch (e) {
+        console.warn(`[shopifyService] Tag update ("${tag}") failed for ${orderName}:`, e.response?.status || '', JSON.stringify(e.response?.data?.errors || e.message));
+        outcome.tagError = e.response?.data?.errors || e.message;
+      }
+    }
+
+    outcome.success = true;
+    return outcome;
+  } catch (error) {
+    console.error(`[shopifyService] updateOrderStatus error for ${orderName}:`, error.message);
+    return { ...outcome, error: error.message };
+  }
+}
+
 module.exports = {
   getUnfulfilledOrders,
   fulfillOrder,
+  updateOrderStatus,
 };

@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const tcsService = require('../services/tcsService');
+const trackingService = require('../services/trackingService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -237,6 +238,41 @@ router.get('/print-label', async (req, res) => {
     return res.send(buffer);
   } catch (e) {
     return sendError(res, e, 500);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tracking — admin/test trigger to run a tracking cycle for a shop on demand.
+// The primary refresh path is the background poller (trackingService.startPoller);
+// this endpoint exists so a cycle can be forced without waiting for the interval.
+// POST /api/tcs/track  { shop }
+// Optional: GET /api/tcs/track/:cn  → raw tracking for one/comma-separated CN(s)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/track', async (req, res) => {
+  const { shop } = req.body;
+  if (!shop) {
+    return res.status(400).json({ success: false, error: 'shop is required.', code: 'MISSING_FIELDS' });
+  }
+  try {
+    const summary = await trackingService.pollShopTracking(shop);
+    res.json({ success: true, ...summary });
+  } catch (e) {
+    sendError(res, e, 500);
+  }
+});
+
+router.get('/track/:cn', async (req, res) => {
+  try {
+    const cns = String(req.params.cn).split(',').map(s => s.trim()).filter(Boolean);
+    const map = await tcsService.trackConsignments(cns);
+    const out = {};
+    for (const cn of cns) {
+      const perCn = map.get(cn);
+      out[cn] = { derived: tcsService.deriveStatus(perCn), detail: perCn };
+    }
+    res.json({ success: true, results: out });
+  } catch (e) {
+    sendError(res, e, 500);
   }
 });
 
