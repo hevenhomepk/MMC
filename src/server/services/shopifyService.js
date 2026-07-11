@@ -359,8 +359,99 @@ async function updateOrderStatus(shop, orderName, { eventStatus, tag, fulfillmen
   }
 }
 
+/**
+ * Cancels the fulfillment(s) on a Shopify order, reverting it to "unfulfilled".
+ * Used by the "Delete / revert to Unfulfilled" action so a booked order returns
+ * to the Booking Workbench. Also strips any courier-status tags we added.
+ * Never throws — returns a result summary the caller can inspect per order.
+ *
+ * @param {string} shop
+ * @param {string} orderName          Shopify order name, e.g. "#1002"
+ * @param {object} opts
+ * @param {string} [opts.fulfillmentId] Known fulfillment id (skips a lookup)
+ * @param {string[]} [opts.removeTags]  Order tags to strip (e.g. the courier status)
+ */
+async function cancelFulfillment(shop, orderName, { fulfillmentId, removeTags } = {}) {
+  const outcome = { success: false, cancelled: false, tagsRemoved: false };
+  try {
+    if (!shop || !orderName) return { ...outcome, error: 'Missing shop or orderName' };
+
+    const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    if (!accessToken) return { ...outcome, error: 'No access token' };
+
+    const headers = { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' };
+
+    const order = await findOrderByName(shop, orderName, accessToken);
+    if (!order) return { ...outcome, error: `Order ${orderName} not found` };
+    const orderId = order.id;
+
+    // ── 1. Cancel fulfillment(s) → returns line items to unfulfilled ────────────
+    let fids = [];
+    if (fulfillmentId) {
+      fids = [fulfillmentId];
+    } else {
+      const fRes = await axios.get(
+        `https://${shop}/admin/api/2025-01/orders/${orderId}/fulfillments.json`,
+        { headers }
+      );
+      fids = (fRes.data?.fulfillments || [])
+        .filter(f => f.status !== 'cancelled')
+        .map(f => f.id);
+    }
+
+    if (fids.length === 0) {
+      // Nothing fulfilled on Shopify (already unfulfilled) — treat as success so the
+      // local booking can still be removed.
+      outcome.alreadyUnfulfilled = true;
+    }
+
+    for (const fid of fids) {
+      try {
+        await axios.post(
+          `https://${shop}/admin/api/2025-01/fulfillments/${fid}/cancel.json`,
+          {},
+          { headers }
+        );
+        outcome.cancelled = true;
+      } catch (e) {
+        console.warn(`[shopifyService] Cancel fulfillment ${fid} failed for ${orderName}:`, e.response?.status || '', JSON.stringify(e.response?.data?.errors || e.message));
+        outcome.cancelError = e.response?.data?.errors || e.message;
+      }
+    }
+
+    // ── 2. Remove courier-status tags we added (best-effort) ────────────────────
+    if (removeTags && removeTags.length) {
+      try {
+        const rmSet = new Set(removeTags.filter(Boolean).map(t => String(t).toLowerCase()));
+        const existing = (order.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        const kept = existing.filter(t => !rmSet.has(t.toLowerCase()));
+        if (kept.length !== existing.length) {
+          await axios.put(
+            `https://${shop}/admin/api/2025-01/orders/${orderId}.json`,
+            { order: { id: orderId, tags: kept.join(', ') } },
+            { headers }
+          );
+          outcome.tagsRemoved = true;
+        }
+      } catch (e) {
+        console.warn(`[shopifyService] Tag removal failed for ${orderName}:`, e.response?.status || '', JSON.stringify(e.response?.data?.errors || e.message));
+        outcome.tagError = e.response?.data?.errors || e.message;
+      }
+    }
+
+    // Success if we cancelled something, or there was nothing to cancel, and no hard cancel error blocked it.
+    outcome.success = outcome.cancelled || outcome.alreadyUnfulfilled === true;
+    if (!outcome.success && outcome.cancelError) outcome.error = 'Failed to cancel fulfillment on Shopify';
+    return outcome;
+  } catch (error) {
+    console.error(`[shopifyService] cancelFulfillment error for ${orderName}:`, error.message);
+    return { ...outcome, error: error.message };
+  }
+}
+
 module.exports = {
   getUnfulfilledOrders,
   fulfillOrder,
   updateOrderStatus,
+  cancelFulfillment,
 };

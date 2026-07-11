@@ -4,6 +4,12 @@ import { printCustomLabels } from '../utils/customLabel';
 
 const STATUSES = ['All', 'Booked', 'Shipped', 'Loadsheet', 'Assigned', 'Pending', 'Refused', 'Delivered', 'Returned', 'RTS', 'Cancelled'];
 
+// Target statuses selectable in Actions → Change Status. 'Unfulfilled' is the
+// special revert action: it cancels the Shopify fulfillment and removes the local
+// booking so the order returns to the unfulfilled list (must match server sentinel).
+const CHANGE_STATUS_OPTIONS = STATUSES.slice(1); // app statuses (drop 'All')
+const UNFULFILL_STATUS = 'Unfulfilled';
+
 // TCS CNPrint printtype values (see devconnect.tcscourier.com CNPrint API)
 const PRINT_TYPES = [
   { value: '3', label: '6x4 Label' },
@@ -150,6 +156,59 @@ function TrackResultsModal({ results, onClose }) {
   );
 }
 
+// Modal for Actions → Change Status: pick a target status for the selected orders.
+function StatusChangeModal({ count, busy, onApply, onClose }) {
+  const [status, setStatus] = useState('Booked');
+  const isRevert = status === UNFULFILL_STATUS;
+
+  return (
+    <div onClick={busy ? undefined : onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)', borderRadius: '14px', maxWidth: '440px', width: '100%', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>Change Status</h3>
+          <button onClick={onClose} disabled={busy} style={{ background: 'transparent', border: 'none', fontSize: '22px', cursor: busy ? 'not-allowed' : 'pointer', color: 'var(--muted, #64748b)', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '20px 24px' }}>
+          <p style={{ margin: '0 0 14px', fontSize: '14px', color: 'var(--muted, #64748b)' }}>
+            Apply a new status to <strong style={{ color: 'var(--text, #0f172a)' }}>{count}</strong> selected order{count === 1 ? '' : 's'}.
+          </p>
+
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>New Status</label>
+          <select
+            value={status}
+            onChange={e => setStatus(e.target.value)}
+            disabled={busy}
+            style={{ width: '100%', height: '42px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border, #e2e8f0)', background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)', fontSize: '14px', outline: 'none' }}
+          >
+            <optgroup label="Set status">
+              {CHANGE_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </optgroup>
+            <optgroup label="Revert">
+              <option value={UNFULFILL_STATUS}>Delete — revert to Unfulfilled</option>
+            </optgroup>
+          </select>
+
+          {isRevert && (
+            <div style={{ marginTop: '14px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', fontSize: '13px', color: '#b91c1c', lineHeight: 1.5 }}>
+              <strong>This cancels the Shopify fulfillment</strong> and removes the local booking. The order(s) will go back to <strong>Unfulfilled</strong> on both the app and Shopify. This cannot be undone.
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border, #e2e8f0)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button onClick={onClose} disabled={busy} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border, #e2e8f0)', background: 'var(--surface, #fff)', color: 'var(--text, #0f172a)', fontWeight: 700, fontSize: '13px', cursor: busy ? 'not-allowed' : 'pointer' }}>Cancel</button>
+          <button
+            onClick={() => onApply(status)}
+            disabled={busy}
+            style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: isRevert ? '#ef4444' : 'var(--green, #10b981)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1 }}
+          >
+            {busy ? 'Applying…' : (isRevert ? 'Revert to Unfulfilled' : 'Apply Status')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CourierLogs({ shop, courierFilter }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -170,6 +229,10 @@ export default function CourierLogs({ shop, courierFilter }) {
   // Tracking
   const [tracking, setTracking] = useState(false);
   const [trackResults, setTrackResults] = useState(null); // array or null (modal closed)
+
+  // Change Status (Actions menu)
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -325,6 +388,57 @@ export default function CourierLogs({ shop, courierFilter }) {
     }
   };
 
+  // Open the Change Status modal (from the Actions menu). Requires a selection.
+  const openStatusModal = () => {
+    if (selectedIds.size === 0) {
+      alert('Please select at least one order first.');
+      return;
+    }
+    setShowActions(false);
+    setShowStatusModal(true);
+  };
+
+  // Apply the chosen status to the selected orders. 'Unfulfilled' reverts on both
+  // the app and Shopify (cancel fulfillment + delete booking); others are local.
+  const applyStatusChange = async (status) => {
+    const ids = filteredLogs.filter(b => selectedIds.has(b.id)).map(b => b.id);
+    if (ids.length === 0) { alert('Please select at least one order first.'); return; }
+
+    setStatusUpdating(true);
+    try {
+      const resp = await fetch('/api/bookings/change-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop, ids, status }),
+      });
+      const data = await resp.json();
+      // Hard failure (bad request / server error) — no per-order results to report.
+      if (!data.results) {
+        alert('Status change failed: ' + (data.error || 'Unknown error'));
+        return;
+      }
+
+      await fetchLogs();
+      setSelectedIds(new Set());
+      setShowStatusModal(false);
+
+      const failed = data.failed || 0;
+      if (failed > 0) {
+        const firstErr = (data.results || []).find(r => !r.success);
+        alert(`${data.updated || 0} order(s) updated, ${failed} failed.` + (firstErr ? `\nExample: ${firstErr.order_id} — ${firstErr.error}` : ''));
+      } else if (status === UNFULFILL_STATUS) {
+        alert(`${data.updated || ids.length} order(s) reverted to Unfulfilled on the app and Shopify.`);
+      } else {
+        alert(`${data.updated || ids.length} order(s) updated to "${status}".`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Status change failed: ' + e.message);
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const SortIcon = ({ col }) => {
     if (sortConfig.key !== col) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>;
     return <span style={{ marginLeft: '4px', color: '#3b82f6' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
@@ -440,9 +554,9 @@ export default function CourierLogs({ shop, courierFilter }) {
                 overflow: 'hidden'
               }}>
                 {['Sales Report', 'Item Report', 'Download Report', 'Change Status'].map(opt => (
-                  <div 
+                  <div
                     key={opt}
-                    onClick={() => { alert(opt + ' clicked'); setShowActions(false); }}
+                    onClick={() => { if (opt === 'Change Status') { openStatusModal(); } else { alert(opt + ' clicked'); setShowActions(false); } }}
                     style={{
                       padding: '12px 16px',
                       fontSize: '14px',
@@ -528,6 +642,15 @@ export default function CourierLogs({ shop, courierFilter }) {
 
       {trackResults && (
         <TrackResultsModal results={trackResults} onClose={() => setTrackResults(null)} />
+      )}
+
+      {showStatusModal && (
+        <StatusChangeModal
+          count={selectedIds.size}
+          busy={statusUpdating}
+          onApply={applyStatusChange}
+          onClose={() => { if (!statusUpdating) setShowStatusModal(false); }}
+        />
       )}
     </div>
   );

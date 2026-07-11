@@ -84,6 +84,45 @@ async function deleteBooking(id, shop) {
   }
 }
 
+/**
+ * Loads the given bookings (by id) for a shop — used by the bulk "Change Status"
+ * action to resolve order_id / fulfillment_id before touching Shopify.
+ */
+async function getBookingsByIds(shop, ids) {
+  const list = (Array.isArray(ids) ? ids : [ids])
+    .map(n => parseInt(n, 10))
+    .filter(n => Number.isInteger(n));
+  if (list.length === 0) return [];
+  try {
+    const result = await db.query(
+      `SELECT id, order_id, courier, tracking_number, status, fulfillment_id
+         FROM bookings
+        WHERE shop_domain = $1 AND id = ANY($2)`,
+      [shop, list]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error loading bookings by ids:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Sets a booking's app status (Booked / Shipped / Delivered / ...).
+ */
+async function updateStatus(id, shop, status) {
+  try {
+    await db.query(
+      `UPDATE bookings SET status = $3 WHERE id = $1 AND shop_domain = $2`,
+      [id, shop, status]
+    );
+    return { success: true };
+  } catch (error) {
+    console.error(`Error updating status for booking ${id}:`, error.message);
+    throw error;
+  }
+}
+
 async function findBookingByTrackingForLoadsheet(shop, courier, trackingOrOrder) {
   try {
     const result = await db.query(
@@ -222,6 +261,8 @@ module.exports = {
   saveBooking,
   isOrderBooked,
   deleteBooking,
+  getBookingsByIds,
+  updateStatus,
   findBookingByTrackingForLoadsheet,
   findBookingByTrackingForReturn,
   getActiveBookingsForTracking,
